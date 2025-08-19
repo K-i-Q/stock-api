@@ -44,21 +44,37 @@ jobs:
         run: dotnet build StockSolution.sln --no-restore -c Release
 
       - name: Test with coverage
-        run: dotnet test --collect:"XPlat Code Coverage" --logger "trx;LogFileName=test_results.trx" --results-directory ./TestResults
+        run: |
+          dotnet test StockSolution.sln \
+            --no-build -c Release \
+            --collect:"XPlat Code Coverage" \
+            --logger "trx;LogFileName=test_results.trx" \
+            --results-directory ${{ github.workspace }}/TestResults
+
+      - name: Debug coverage files
+        run: |
+          echo "Workspace: $GITHUB_WORKSPACE"
+          find "$GITHUB_WORKSPACE" -type f -name "coverage.cobertura.xml" -print || true
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: TestResults/**/coverage.cobertura.xml
+          path: |
+            ${{ github.workspace }}/TestResults/**/coverage.cobertura.xml
+            **/TestResults/**/coverage.cobertura.xml
 
       - name: Upload test results (trx)
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: TestResults/*.trx
+          path: ${{ github.workspace }}/TestResults/*.trx
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: TestResults/**/coverage.cobertura.xml
+          files: |
+            ${{ github.workspace }}/TestResults/**/coverage.cobertura.xml
+            **/TestResults/**/coverage.cobertura.xml
+          fail_ci_if_error: false
+          verbose: true
