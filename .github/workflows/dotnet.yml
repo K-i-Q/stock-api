@@ -36,18 +36,8 @@ jobs:
 
       - name: Install dotnet-format (latest available)
         run: dotnet tool install -g dotnet-format || dotnet tool update -g dotnet-format
-      - name: Lint (auto-detect flag)
-        shell: bash
-        run: |
-          set -e
-          dotnet-format --version
-          if dotnet-format --help | grep -q -- "--check"; then
-            echo "Using --check"
-            dotnet-format StockSolution.sln --check --verbosity minimal
-          else
-            echo "Using --verify-no-changes"
-            dotnet-format StockSolution.sln --verify-no-changes --verbosity minimal
-          fi
+      - name: Lint
+        run: dotnet format --verify-no-changes
 
       - name: Build (Release)
         run: dotnet build StockSolution.sln --no-restore -c Release
