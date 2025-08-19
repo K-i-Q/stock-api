@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+*.user
+*.suo
+*.swp
+*.DS_Store
+.vs/
+.vscode/
+.idea/
+
+*.pid
+docker-compose.override.yml
+
+.env
