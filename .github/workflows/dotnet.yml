@@ -47,17 +47,18 @@ jobs:
         run: |
           mkdir -p ${{ github.workspace }}/Coverage
           dotnet test StockApi.Tests/StockApi.Tests.csproj \
-            --no-build -c Release \
+            -c Release \
             /p:CollectCoverage=true \
             /p:CoverletOutputFormat=cobertura \
-            /p:CoverletOutput=${{ github.workspace }}/Coverage/coverage.cobertura.xml \
-            /p:ExcludeByFile="**/Migrations/*.cs"
+            /p:CoverletOutput=${{ github.workspace }}/Coverage/coverage \
+            /p:ExcludeByFile="**/Migrations/*.cs" \
+            --logger "trx;LogFileName=test_results.trx"
 
       - name: Debug - listar arquivos gerados
         run: |
           echo "Workspace: $GITHUB_WORKSPACE"
-          ls -la $GITHUB_WORKSPACE/Coverage || true
-          find "$GITHUB_WORKSPACE" -type f -name "coverage.cobertura.xml" -print || true
+          ls -la "$GITHUB_WORKSPACE/Coverage" || true
+          find "$GITHUB_WORKSPACE" -type f \( -name "coverage.cobertura.xml" -o -name "*.trx" \) -print || true
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
@@ -69,7 +70,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: ${{ github.workspace }}/**/*.trx
+          path: ${{ github.workspace }}/**/test_results.trx
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
