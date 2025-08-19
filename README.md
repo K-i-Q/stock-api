@@ -2,7 +2,7 @@ StockApi — Gestão de Estoque e Produtos
 
 # StockApi
 
-![.NET CI](https://github.com/SEU_USUARIO/stock-api/actions/workflows/dotnet.yml/badge.svg)
+![.NET CI](https://github.com/K-i-Q/stock-api/actions/workflows/dotnet.yml/badge.svg)
 
 [![codecov](https://codecov.io/gh/carlosoliveira/stock-api/branch/main/graph/badge.svg)](https://codecov.io/gh/carlosoliveira/stock-api)
 
