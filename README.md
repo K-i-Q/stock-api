@@ -4,6 +4,8 @@ StockApi — Gestão de Estoque e Produtos
 
 ![Build](https://github.com/K-i-Q/StockApi/actions/workflows/dotnet.yml/badge.svg)
 
+[![codecov](https://codecov.io/gh/K-i-Q/StockApi/branch/main/graph/badge.svg)](https://codecov.io/gh/K-i-Q/StockApi)
+
 API em .NET 9 (Minimal APIs) para cadastro de usuários, autenticação JWT, catálogo de produtos, controle de estoque e emissão de pedidos — pronta para rodar em Docker e com testes automatizados.
 
 Domínio escolhido: equipamentos esportivos (genérico o suficiente para outros domínios do enunciado).
