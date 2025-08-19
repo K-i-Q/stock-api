@@ -1,2 +1,14 @@
+# Normaliza todos os arquivos de texto para LF
 * text=auto eol=lf
-*.cs text eol=lf
+
+# Reforça para os arquivos C# e configs
+*.cs       text eol=lf
+*.csproj   text eol=lf
+*.sln      text eol=lf
+*.props    text eol=lf
+*.targets  text eol=lf
+*.yml      text eol=lf
+*.yaml     text eol=lf
+*.json     text eol=lf
+*.xml      text eol=lf
+*.md       text eol=lf
