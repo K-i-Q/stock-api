@@ -10,11 +10,14 @@ using StockApi.Services;
 using System.Text;
 using System.Linq;
 using System.Security.Cryptography;
+using OpenTelemetry.Trace;
+using OpenTelemetry.Resources;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenTelemetry()
     .WithTracing(t => t
+        .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("StockApi"))
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
         .AddSource("StockApi")
