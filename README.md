@@ -4,7 +4,7 @@ StockApi — Gestão de Estoque e Produtos
 
 ![.NET CI](https://github.com/K-i-Q/stock-api/actions/workflows/dotnet.yml/badge.svg)
 
-[![codecov](https://codecov.io/gh/carlosoliveira/stock-api/branch/main/graph/badge.svg)](https://codecov.io/gh/carlosoliveira/stock-api)
+[![codecov](https://codecov.io/gh/K-i-Q/stock-api/branch/main/graph/badge.svg)](https://codecov.io/gh/K-i-Q/stock-api)
 
 API em .NET 9 (Minimal APIs) para cadastro de usuários, autenticação JWT, catálogo de produtos, controle de estoque e emissão de pedidos — pronta para rodar em Docker e com testes automatizados.
 
