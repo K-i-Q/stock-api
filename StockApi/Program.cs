@@ -12,8 +12,19 @@ using System.Linq;
 using System.Security.Cryptography;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Resources;
+using StockApi.Messaging;
+using StockApi.Events;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// RabbitMQ DI
+var mqHost = builder.Configuration["RabbitMq:Host"] ?? Environment.GetEnvironmentVariable("RabbitMq__Host") ?? "localhost";
+var mqUser = builder.Configuration["RabbitMq:User"] ?? Environment.GetEnvironmentVariable("RabbitMq__User") ?? "guest";
+var mqPass = builder.Configuration["RabbitMq:Pass"] ?? Environment.GetEnvironmentVariable("RabbitMq__Pass") ?? "guest";
+
+builder.Services.AddSingleton<IMessageBus>(_ => new RabbitMqMessageBus(mqHost, mqUser, mqPass));
+builder.Services.AddHostedService<OrderCreatedConsumer>();
+
 
 builder.Services.AddOpenTelemetry()
     .WithTracing(t => t
@@ -256,7 +267,7 @@ stock.MapPost("/entries", async (StockEntryRequest req, AppDbContext db) =>
 #region ORDERS - Seller or Admin
 var orders = app.MapGroup("/orders").RequireAuthorization("SellerOrAdmin");
 
-orders.MapPost("/", async (CreateOrderRequest req, AppDbContext db) =>
+orders.MapPost("/", async (CreateOrderRequest req, AppDbContext db, IMessageBus bus) =>
 {
     if (req.Items is null || req.Items.Count == 0) return Results.BadRequest("No items.");
     if (req.Items.Any(i => i.Quantity <= 0)) return Results.BadRequest("All quantities must be > 0.");
@@ -266,7 +277,6 @@ orders.MapPost("/", async (CreateOrderRequest req, AppDbContext db) =>
 
     if (productsDb.Count != productIds.Count) return Results.BadRequest("Some product(s) not found.");
 
-    // Validar estoque
     foreach (var it in req.Items)
     {
         var p = productsDb.First(x => x.Id == it.ProductId);
@@ -300,6 +310,16 @@ orders.MapPost("/", async (CreateOrderRequest req, AppDbContext db) =>
 
     db.Orders.Add(order);
     await db.SaveChangesAsync();
+
+    var evt = new OrderCreatedEvent(
+        order.Id,
+        order.CustomerDocument,
+        order.SellerName,
+        order.CreatedAt,
+        order.Items.Select(i => new OrderItemPayload(i.ProductId, i.Quantity, i.UnitPrice)).ToList()
+    );
+
+    await bus.PublishAsync("stock.events", "orders.created", evt);
 
     return Results.Created($"/orders/{order.Id}", new
     {

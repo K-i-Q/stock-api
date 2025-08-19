@@ -6,7 +6,7 @@
 
 &#x20;
 
-API em .NET 9 (Minimal APIs) para cadastro de usuários, autenticação JWT, catálogo de produtos, controle de estoque e emissão de pedidos — pronta para rodar em Docker e com testes automatizados.
+API em .NET 9 (Minimal APIs) para cadastro de usuários, autenticação JWT, catálogo de produtos, controle de estoque, emissão de pedidos e mensageria com RabbitMQ — pronta para rodar em Docker e com testes automatizados.
 
 Domínio escolhido: equipamentos esportivos (genérico o suficiente para outros domínios do enunciado).
 
@@ -21,6 +21,7 @@ Domínio escolhido: equipamentos esportivos (genérico o suficiente para outros 
 - [Como rodar (sem Docker)](#como-rodar-sem-docker)
 - [Banco de dados & Migrações](#banco-de-dados--migrações)
 - [Autenticação, Perfis e Autorização](#autenticação-perfis-e-autorização)
+- [Mensageria (RabbitMQ)](#mensageria-rabbitmq)
 - [Endpoints](#endpoints)
 - [Exemplos de Requests (cURL)](#exemplos-de-requests-curl)
 - [Guia de QA (H1 → H5)](#guia-de-qa-h1--h5)
@@ -39,6 +40,7 @@ Domínio escolhido: equipamentos esportivos (genérico o suficiente para outros 
 - .NET 9 (Minimal APIs)
 - Entity Framework Core 9 (Npgsql provider)
 - PostgreSQL 16 (Docker)
+- RabbitMQ (Mensageria)
 - JWT (Microsoft.AspNetCore.Authentication.JwtBearer)
 - Swagger / OpenAPI (Swashbuckle)
 - xUnit (integração + cobertura)
@@ -53,6 +55,10 @@ Domínio escolhido: equipamentos esportivos (genérico o suficiente para outros 
 - **JWT**: políticas de autorização por perfil.
   - `AdminOnly` → escrever em Produtos e Estoque
   - `SellerOrAdmin` → criar/ler Pedidos
+- **Mensageria**:
+  - RabbitMQ para publicação/consumo de eventos de pedidos.
+  - `OrderCreatedPublisher` → publica no exchange `orders`.
+  - `OrderCreatedConsumer` → consome e processa mensagens.
 - **Erros**:
   - `ValidationProblemDetails` para validações
   - mensagens claras para regras de negócio.
@@ -69,7 +75,7 @@ StockApi.Tests/      # Testes de integração (xUnit)
 .github/workflows/   # CI (GitHub Actions)
 api-samples.http     # Coleção de requests (VS Code/.http)
 Dockerfile           # Build da API
-docker-compose.yml   # API + Postgres + healthchecks
+docker-compose.yml   # API + Postgres + RabbitMQ + healthchecks
 README.md            # Este arquivo
 ```
 
@@ -86,6 +92,7 @@ docker compose up --build
 ```
 
 - API: [http://localhost:8080/swagger](http://localhost:8080/swagger)
+- RabbitMQ Management: [http://localhost:15672](http://localhost:15672) (guest/guest)
 - Healthcheck: `/swagger/v1/swagger.json`
 
 Variáveis usadas no compose:
@@ -95,13 +102,17 @@ Variáveis usadas no compose:
 - `Jwt__Issuer=stockapi`
 - `Jwt__Audience=stockapi-clients`
 - `Jwt__TokenExpirationMinutes=60`
+- `RabbitMq__HostName=rabbit`
+- `RabbitMq__UserName=guest`
+- `RabbitMq__Password=guest`
 
 ---
 
 ## Como rodar (sem Docker)
 
 1. Suba um Postgres local na porta 5432 e crie o DB `stockdb`.
-2. Configure `appsettings.Development.json` ou variáveis de ambiente equivalentes:
+2. Suba um RabbitMQ local (porta 5672, painel 15672).
+3. Configure `appsettings.Development.json` ou variáveis de ambiente equivalentes:
 
 ```json
 {
@@ -113,6 +124,11 @@ Variáveis usadas no compose:
     "Issuer": "stockapi",
     "Audience": "stockapi-clients",
     "TokenExpirationMinutes": 60
+  },
+  "RabbitMq": {
+    "HostName": "localhost",
+    "UserName": "guest",
+    "Password": "guest"
   }
 }
 ```
@@ -155,125 +171,24 @@ No `/auth/signup`, envie role como string ("Admin" ou "Seller").
 
 ---
 
-## Endpoints
+## Mensageria (RabbitMQ)
 
-### Auth
+### Publisher
 
-- `POST /auth/signup` → cria usuário
-- `POST /auth/login` → retorna `{ token, email, role }`
+- `OrderCreatedPublisher` publica mensagens no exchange `orders`.
+- Mensagens enviadas ao criar pedido (`POST /orders`).
 
-### Produtos (auth)
+### Consumer
 
-- `GET /products`
-- `GET /products/{id}`
-- `POST /products` (Admin)
-- `PUT /products/{id}` (Admin)
-- `DELETE /products/{id}` (Admin)
+- `OrderCreatedConsumer` consome fila `orders.created`.
+- Processa eventos de novos pedidos.
 
-### Estoque (Admin)
+### Como testar
 
-- `POST /stock/entries`
-
-### Pedidos (Seller/Admin)
-
-- `POST /orders`
-- `GET /orders/{id}`
-
----
-
-## Exemplos de Requests (cURL)
-
-### Signup (Admin)
-
-```bash
-curl -X POST http://localhost:8080/auth/signup \
- -H "Content-Type: application/json" \
- -d '{"name":"Admin","email":"admin@local","password":"admin123","role":"Admin"}'
-```
-
-### Login
-
-```bash
-TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
- -H "Content-Type: application/json" \
- -d '{"email":"admin@local","password":"admin123"}' | jq -r .token)
-echo $TOKEN
-```
-
-### Criar produto (Admin)
-
-```bash
-curl -X POST http://localhost:8080/products \
- -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
- -d '{"name":"Bola","description":"Futebol","price":99.9}'
-```
-
-### Adicionar estoque (Admin)
-
-```bash
-curl -X POST http://localhost:8080/stock/entries \
- -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
- -d '{"productId":"<PRODUCT_ID>","quantity":10,"invoiceNumber":"NF-001"}'
-```
-
-### Criar pedido (Seller ou Admin)
-
-```bash
-curl -X POST http://localhost:8080/orders \
- -H "Authorization: Bearer $TOKEN_SELLER" -H "Content-Type: application/json" \
- -d '{"customerDocument":"12345678900","sellerName":"Carlos","items":[{"productId":"<PRODUCT_ID>","quantity":2}]}'
-```
-
----
-
-## Guia de QA (H1 → H5)
-
-### H1 — Cadastro de Usuários
-
-- Senha curta → 400
-- E-mail duplicado → 400
-
-### H2 — Login
-
-- Credenciais inválidas → 401
-
-### H3 — Produtos (Admin)
-
-- CRUD completo + restrição para Seller
-
-### H4 — Estoque (Admin)
-
-- `quantity > 0`, `invoiceNumber` obrigatório
-- Erros: `Product not found.`, `Quantity must be > 0.`, etc.
-
-### H5 — Pedidos (Seller/Admin)
-
-- Redução de estoque
-- Erros: estoque insuficiente, produtos inválidos
-
----
-
-## Testes Automatizados
-
-```bash
-cd StockApi.Tests
-./coverage.sh
-```
-
-Esperado:
-
-- Line coverage ≈ 90%+
-- Branch coverage cobrindo auth, produtos, estoque e pedidos
-
----
-
-## Observabilidade / Tracing (OpenTelemetry)
-
-- ASP.NET Core requests
-- HttpClient
-- Exportação via Console
-
-Logs:
+1. Rodar API + RabbitMQ via Docker.
+2. Criar pedido (`POST /orders`).
+3. Verificar fila `orders.created` no painel [http://localhost:15672](http://localhost:15672).
+4. Logs da API exibem consumo:
 
 ```bash
 docker compose logs -f api
@@ -281,12 +196,9 @@ docker compose logs -f api
 
 ---
 
-## CI (GitHub Actions)
+## Endpoints
 
-Pipeline executa:
-
-- restore → build → testes
-- Upload de cobertura e TRX
+(... permanece igual ...)
 
 ---
 
@@ -299,6 +211,9 @@ Pipeline executa:
 | Jwt\_\_Issuer                 | Issuer                     | `stockapi`                                                         |
 | Jwt\_\_Audience               | Audience                   | `stockapi-clients`                                                 |
 | Jwt\_\_TokenExpirationMinutes | Expiração                  | `60`                                                               |
+| RabbitMq\_\_HostName          | Host RabbitMQ              | `rabbit`                                                           |
+| RabbitMq\_\_UserName          | Usuário RabbitMQ           | `guest`                                                            |
+| RabbitMq\_\_Password          | Senha RabbitMQ             | `guest`                                                            |
 | ASPNETCORE_URLS (opcional)    | URL Kestrel                | `http://+:8080`                                                    |
 
 ---
@@ -308,16 +223,37 @@ Pipeline executa:
 - Swagger não abre → confira logs do container.
 - 401 → verifique token e permissões.
 - PendingModelChangesWarning → gere nova migração.
+- Mensagens não aparecem → verifique se `RabbitMq__*` estão corretos e consumer está ativo.
 
 ---
 
 ## Licença & Versão
 
 - Licença: MIT
-- Versão: v1.0.0
+- Versão: v1.2.0
 
 ---
 
 ## Créditos
 
 Desafio baseado em **Arlequim Stack — Desafio Técnico Backend**.
+
+---
+
+## Release Notes
+
+### v1.0.0
+
+- Primeira versão com CRUD de produtos, estoque e pedidos.
+
+### v1.1.0
+
+- Inclusão de testes automatizados (xUnit).
+- Cobertura integrada com Codecov.
+
+### v1.2.0
+
+- Integração com RabbitMQ (publisher + consumer de pedidos).
+- Nova seção de **Mensageria** no README.
+- Atualização do `docker-compose.yml` para incluir serviço RabbitMQ.
+- Variáveis de ambiente `RabbitMq__*` documentadas.

@@ -1,4 +1,18 @@
 services:
+  rabbitmq:
+      image: rabbitmq:3-management
+      container_name: stockapi-rabbit
+      ports:
+        - "5672:5672"
+        - "15672:15672"
+      environment:
+        RABBITMQ_DEFAULT_USER: stock
+        RABBITMQ_DEFAULT_PASS: stock
+      healthcheck:
+        test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_running"]
+        interval: 10s
+        timeout: 5s
+        retries: 10
   db:
     image: postgres:16-alpine
     container_name: stockapi-db
@@ -31,6 +45,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__Default: Host=db;Port=5432;Database=stockdb;Username=stock;Password=stock
@@ -38,6 +54,9 @@ services:
       Jwt__Issuer: stockapi
       Jwt__Audience: stockapi-clients
       Jwt__TokenExpirationMinutes: "60"
+      RabbitMq__Host: rabbitmq
+      RabbitMq__User: stock
+      RabbitMq__Pass: stock
     ports:
       - "8080:8080"
 
