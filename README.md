@@ -1,5 +1,9 @@
 # StockApi — Gestão de Estoque e Produtos
 
+![.NET CI](https://github.com/K-i-Q/stock-api/actions/workflows/dotnet.yml/badge.svg)
+
+[![codecov](https://codecov.io/gh/K-i-Q/stock-api/branch/main/graph/badge.svg)](https://codecov.io/gh/K-i-Q/stock-api)
+
 &#x20;
 
 API em .NET 9 (Minimal APIs) para cadastro de usuários, autenticação JWT, catálogo de produtos, controle de estoque e emissão de pedidos — pronta para rodar em Docker e com testes automatizados.
@@ -295,7 +299,7 @@ Pipeline executa:
 | Jwt\_\_Issuer                 | Issuer                     | `stockapi`                                                         |
 | Jwt\_\_Audience               | Audience                   | `stockapi-clients`                                                 |
 | Jwt\_\_TokenExpirationMinutes | Expiração                  | `60`                                                               |
-| ASPNETCORE\_URLS (opcional)   | URL Kestrel                | `http://+:8080`                                                    |
+| ASPNETCORE_URLS (opcional)    | URL Kestrel                | `http://+:8080`                                                    |
 
 ---
 
@@ -317,4 +321,3 @@ Pipeline executa:
 ## Créditos
 
 Desafio baseado em **Arlequim Stack — Desafio Técnico Backend**.
-
