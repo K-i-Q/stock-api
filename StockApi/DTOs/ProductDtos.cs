@@ -1,4 +1,10 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace StockApi.Dtos;
 
-public record ProductCreateRequest(string Name, string Description, decimal Price);
-public record ProductUpdateRequest(string Name, string Description, decimal Price);
+public class ProductUpsertRequest
+{
+    [Required, StringLength(200)] public string Name { get; set; } = default!;
+    [Required, StringLength(2000)] public string Description { get; set; } = default!;
+    [Range(0.01, double.MaxValue)] public decimal Price { get; set; }
+}

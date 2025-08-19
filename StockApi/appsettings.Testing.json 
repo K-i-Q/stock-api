@@ -1,0 +1,8 @@
+{
+  "Jwt": {
+    "Key": "THIS_IS_A_LONG_TEST_KEY_32+CHARS_MIN_1234567890"
+  },
+  "ConnectionStrings": {
+    "Default": "Host=localhost;Database=ignored-in-testing;Username=ignored;Password=ignored"
+  }
+}

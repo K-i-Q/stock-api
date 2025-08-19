@@ -1,32 +1,52 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using StockApi.Data;
 using StockApi.Dtos;
+using StockApi.Filters;
 using StockApi.Models;
 using StockApi.Services;
 using System.Text;
-using Microsoft.OpenApi.Models;
+using System.Linq;
+using System.Security.Cryptography;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// DB (Postgres)
+builder.Services.AddProblemDetails();
+
+// DB
 builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+{
+    if (builder.Environment.IsEnvironment("Testing"))
+        opt.UseInMemoryDatabase("StockApiTests");
+    else
+        opt.UseNpgsql(builder.Configuration.GetConnectionString("Default"));
+});
 
 // Auth (JWT)
-var key = builder.Configuration["Jwt:Key"] ?? "dev-secret-change";
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-  .AddJwtBearer(o =>
-  {
-      o.TokenValidationParameters = new()
-      {
-          ValidateIssuer = false,
-          ValidateAudience = false,
-          ValidateIssuerSigningKey = true,
-          IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key))
-      };
-  });
+var key = builder.Configuration["Jwt:Key"];
+
+if (string.IsNullOrWhiteSpace(key) || Encoding.UTF8.GetByteCount(key) < 32)
+{
+    key = (key ?? string.Empty).PadRight(32, '0');
+}
+
+var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+builder.Services.AddSingleton(signingKey);
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(o =>
+    {
+        o.TokenValidationParameters = new()
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = signingKey
+        };
+    });
 
 builder.Services.AddAuthorization(options =>
 {
@@ -66,8 +86,10 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
+
 // Swagger
-if (app.Environment.IsDevelopment() || true) // força sempre habilitar
+if (app.Environment.IsDevelopment() || true)
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
@@ -77,7 +99,8 @@ if (app.Environment.IsDevelopment() || true) // força sempre habilitar
     });
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsEnvironment("Testing"))
+    app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -93,21 +116,24 @@ auth.MapPost("/signup", async (SignupRequest req, AppDbContext db) =>
     var exists = await db.Users.AnyAsync(u => u.Email == req.Email);
     if (exists) return Results.BadRequest("E-mail already registered.");
 
-    if (!Enum.TryParse<UserRole>(req.Role, ignoreCase: true, out var role))
-        return Results.BadRequest("Role must be Admin or Seller.");
-
     var user = new User
     {
         Id = Guid.NewGuid(),
         Name = req.Name.Trim(),
         Email = req.Email.Trim().ToLowerInvariant(),
         PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password),
-        Role = role
+        Role = req.Role
     };
 
     db.Users.Add(user);
     await db.SaveChangesAsync();
     return Results.Created($"/users/{user.Id}", new { user.Id, user.Name, user.Email, user.Role });
+})
+.AddEndpointFilter(new ValidationFilter<SignupRequest>())
+.WithOpenApi(op =>
+{
+    op.Summary = "Add user (Admin/Seller)";
+    return op;
 });
 
 auth.MapPost("/login", async (LoginRequest req, AppDbContext db, JwtTokenService tokens) =>
@@ -119,8 +145,14 @@ auth.MapPost("/login", async (LoginRequest req, AppDbContext db, JwtTokenService
         return Results.Unauthorized();
 
     var token = tokens.Generate(user);
-    return Results.Ok(new LoginResponse(token));
-});
+    return Results.Ok(new LoginResponse
+    {
+        Token = token,
+        Email = user.Email,
+        Role = user.Role.ToString()
+    });
+})
+.AddEndpointFilter(new ValidationFilter<LoginRequest>());
 #endregion
 
 #region PRODUCTS (CRUD) - Admin only for write; read open to authenticated
@@ -128,13 +160,14 @@ var products = app.MapGroup("/products");
 
 products.MapGet("/", async (AppDbContext db) =>
     await db.Products.AsNoTracking().ToListAsync())
-    .RequireAuthorization(); // qualquer autenticado
+    .RequireAuthorization();
 
 products.MapGet("/{id:guid}", async (Guid id, AppDbContext db) =>
 {
     var p = await db.Products.FindAsync(id);
     return p is null ? Results.NotFound() : Results.Ok(p);
-}).RequireAuthorization();
+})
+.RequireAuthorization();
 
 products.MapPost("/", async (ProductCreateRequest req, AppDbContext db) =>
 {
@@ -149,18 +182,24 @@ products.MapPost("/", async (ProductCreateRequest req, AppDbContext db) =>
     db.Products.Add(p);
     await db.SaveChangesAsync();
     return Results.Created($"/products/{p.Id}", p);
-}).RequireAuthorization("AdminOnly");
+})
+.RequireAuthorization("AdminOnly")
+.AddEndpointFilter(new ValidationFilter<ProductCreateRequest>());
 
 products.MapPut("/{id:guid}", async (Guid id, ProductUpdateRequest req, AppDbContext db) =>
 {
     var p = await db.Products.FindAsync(id);
     if (p is null) return Results.NotFound();
+
     p.Name = req.Name.Trim();
     p.Description = req.Description ?? "";
     p.Price = req.Price;
+
     await db.SaveChangesAsync();
     return Results.NoContent();
-}).RequireAuthorization("AdminOnly");
+})
+.RequireAuthorization("AdminOnly")
+.AddEndpointFilter(new ValidationFilter<ProductUpdateRequest>());
 
 products.MapDelete("/{id:guid}", async (Guid id, AppDbContext db) =>
 {
@@ -169,7 +208,8 @@ products.MapDelete("/{id:guid}", async (Guid id, AppDbContext db) =>
     db.Products.Remove(p);
     await db.SaveChangesAsync();
     return Results.NoContent();
-}).RequireAuthorization("AdminOnly");
+})
+.RequireAuthorization("AdminOnly");
 #endregion
 
 #region STOCK - Admin only
@@ -194,7 +234,8 @@ stock.MapPost("/entries", async (StockEntryRequest req, AppDbContext db) =>
 
     await db.SaveChangesAsync();
     return Results.Created($"/stock/entries/{entry.Id}", new { entry.Id });
-});
+})
+.AddEndpointFilter(new ValidationFilter<StockEntryRequest>());
 #endregion
 
 #region ORDERS - Seller or Admin
@@ -205,11 +246,9 @@ orders.MapPost("/", async (CreateOrderRequest req, AppDbContext db) =>
     if (req.Items is null || req.Items.Count == 0) return Results.BadRequest("No items.");
     if (req.Items.Any(i => i.Quantity <= 0)) return Results.BadRequest("All quantities must be > 0.");
 
-    // Carregar produtos utilizados
     var productIds = req.Items.Select(i => i.ProductId).Distinct().ToList();
     var productsDb = await db.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
 
-    // Validar existência
     if (productsDb.Count != productIds.Count) return Results.BadRequest("Some product(s) not found.");
 
     // Validar estoque
@@ -220,7 +259,6 @@ orders.MapPost("/", async (CreateOrderRequest req, AppDbContext db) =>
             return Results.BadRequest($"Insufficient stock for product '{p.Name}'. Available: {p.Stock}, required: {it.Quantity}");
     }
 
-    // Criar pedido e dar baixa
     var order = new Order
     {
         Id = Guid.NewGuid(),
@@ -255,7 +293,8 @@ orders.MapPost("/", async (CreateOrderRequest req, AppDbContext db) =>
         order.SellerName,
         Items = order.Items.Select(i => new { i.ProductId, i.Quantity, i.UnitPrice })
     });
-});
+})
+.AddEndpointFilter(new ValidationFilter<CreateOrderRequest>());
 
 orders.MapGet("/{id:guid}", async (Guid id, AppDbContext db) =>
 {
@@ -268,7 +307,6 @@ orders.MapGet("/{id:guid}", async (Guid id, AppDbContext db) =>
 });
 #endregion
 
-// Seed opcional (admin) — rode uma vez em dev
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -288,3 +326,4 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+public partial class Program { }

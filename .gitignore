@@ -8,6 +8,9 @@
 .vscode/
 .idea/
 
+**/coveragereport/
+**/coveragereport/**
+
 TestResults/
 *.trx
 *.coverage
