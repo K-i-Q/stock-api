@@ -43,38 +43,37 @@ jobs:
       - name: Build (Release)
         run: dotnet build StockSolution.sln --no-restore -c Release
 
-      - name: Test with coverage
+      - name: Test (coverlet.msbuild) - gera cobertura única
         run: |
-          dotnet test StockSolution.sln \
+          mkdir -p ${{ github.workspace }}/Coverage
+          dotnet test StockApi.Tests/StockApi.Tests.csproj \
             --no-build -c Release \
-            --collect:"XPlat Code Coverage" \
-            --logger "trx;LogFileName=test_results.trx" \
-            --results-directory ${{ github.workspace }}/TestResults
+            /p:CollectCoverage=true \
+            /p:CoverletOutputFormat=cobertura \
+            /p:CoverletOutput=${{ github.workspace }}/Coverage/coverage.cobertura.xml \
+            /p:ExcludeByFile="**/Migrations/*.cs"
 
-      - name: Debug coverage files
+      - name: Debug - listar arquivos gerados
         run: |
           echo "Workspace: $GITHUB_WORKSPACE"
+          ls -la $GITHUB_WORKSPACE/Coverage || true
           find "$GITHUB_WORKSPACE" -type f -name "coverage.cobertura.xml" -print || true
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: |
-            ${{ github.workspace }}/TestResults/**/coverage.cobertura.xml
-            **/TestResults/**/coverage.cobertura.xml
+          path: ${{ github.workspace }}/Coverage/coverage.cobertura.xml
 
       - name: Upload test results (trx)
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: ${{ github.workspace }}/TestResults/*.trx
+          path: ${{ github.workspace }}/**/*.trx
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: |
-            ${{ github.workspace }}/TestResults/**/coverage.cobertura.xml
-            **/TestResults/**/coverage.cobertura.xml
+          files: ${{ github.workspace }}/Coverage/coverage.cobertura.xml
           fail_ci_if_error: false
           verbose: true
