@@ -1,5 +1,7 @@
 StockApi
 
+![.NET CI](https://github.com/K-i-Q/stock-api/actions/workflows/dotnet.yml/badge.svg)
+
 API de gestão de estoque e pedidos — .NET 9 + ASP.NET Core (Minimal APIs) + EF Core + PostgreSQL + JWT.
 Testes com xUnit e EF Core InMemory. Contêiner com Docker e orquestração com Docker Compose.
 

@@ -6,24 +6,58 @@ on:
   pull_request:
     branches: ["main"]
 
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
 jobs:
-  build:
+  build_test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET 9
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
 
-      - name: Restore dependencies
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
         run: dotnet restore StockSolution.sln
 
-      - name: Build
-        run: dotnet build StockSolution.sln --no-restore --configuration Release
+      - name: Install dotnet-format
+        run: dotnet tool install -g dotnet-format
+      - name: Lint (dotnet format --verify-no-changes)
+        run: ~/.dotnet/tools/dotnet-format --verify-no-changes
 
-      - name: Run tests
-        run: dotnet test StockSolution.sln --no-build --verbosity normal
+      - name: Build (Release)
+        run: dotnet build StockSolution.sln --no-restore -c Release
+
+      - name: Test with coverage
+        run: |
+          dotnet test StockSolution.sln \
+            --no-build -c Release \
+            /p:CollectCoverage=true \
+            /p:CoverletOutput=./TestResults/coverage/ \
+            /p:CoverletOutputFormat='cobertura'
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-cobertura
+          path: "**/TestResults/coverage/coverage.cobertura.xml"
+
+      - name: Upload test results (trx)
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/TestResults/*.trx"
