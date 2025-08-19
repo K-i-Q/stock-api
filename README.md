@@ -4,11 +4,7 @@
 
 [![codecov](https://codecov.io/gh/K-i-Q/stock-api/branch/main/graph/badge.svg)](https://codecov.io/gh/K-i-Q/stock-api)
 
-&#x20;
-
 API em .NET 9 (Minimal APIs) para cadastro de usuários, autenticação JWT, catálogo de produtos, controle de estoque, emissão de pedidos e mensageria com RabbitMQ — pronta para rodar em Docker e com testes automatizados.
-
-Domínio escolhido: equipamentos esportivos (genérico o suficiente para outros domínios do enunciado).
 
 ---
 
@@ -57,8 +53,8 @@ Domínio escolhido: equipamentos esportivos (genérico o suficiente para outros 
   - `SellerOrAdmin` → criar/ler Pedidos
 - **Mensageria**:
   - RabbitMQ para publicação/consumo de eventos de pedidos.
-  - `OrderCreatedPublisher` → publica no exchange `orders`.
-  - `OrderCreatedConsumer` → consome e processa mensagens.
+  - `OrderCreatedPublisher` → publica no exchange `stock.events` com routing key `orders.created`.
+  - `OrderCreatedConsumer` → consome e processa mensagens da fila.
 - **Erros**:
   - `ValidationProblemDetails` para validações
   - mensagens claras para regras de negócio.
@@ -102,9 +98,9 @@ Variáveis usadas no compose:
 - `Jwt__Issuer=stockapi`
 - `Jwt__Audience=stockapi-clients`
 - `Jwt__TokenExpirationMinutes=60`
-- `RabbitMq__HostName=rabbit`
-- `RabbitMq__UserName=guest`
-- `RabbitMq__Password=guest`
+- `RabbitMq__Host=rabbitmq`
+- `RabbitMq__User=guest`
+- `RabbitMq__Pass=guest`
 
 ---
 
@@ -126,9 +122,9 @@ Variáveis usadas no compose:
     "TokenExpirationMinutes": 60
   },
   "RabbitMq": {
-    "HostName": "localhost",
-    "UserName": "guest",
-    "Password": "guest"
+    "Host": "localhost",
+    "User": "guest",
+    "Pass": "guest"
   }
 }
 ```
@@ -175,19 +171,19 @@ No `/auth/signup`, envie role como string ("Admin" ou "Seller").
 
 ### Publisher
 
-- `OrderCreatedPublisher` publica mensagens no exchange `orders`.
-- Mensagens enviadas ao criar pedido (`POST /orders`).
+- Publica mensagens no exchange `stock.events` com routing key `orders.created`.
+- Executado ao criar pedido (`POST /orders`).
 
 ### Consumer
 
-- `OrderCreatedConsumer` consome fila `orders.created`.
+- `OrderCreatedConsumer` consome fila ligada a `orders.created`.
 - Processa eventos de novos pedidos.
 
 ### Como testar
 
 1. Rodar API + RabbitMQ via Docker.
 2. Criar pedido (`POST /orders`).
-3. Verificar fila `orders.created` no painel [http://localhost:15672](http://localhost:15672).
+3. Verificar fila no painel [http://localhost:15672](http://localhost:15672).
 4. Logs da API exibem consumo:
 
 ```bash
@@ -211,9 +207,9 @@ docker compose logs -f api
 | Jwt\_\_Issuer                 | Issuer                     | `stockapi`                                                         |
 | Jwt\_\_Audience               | Audience                   | `stockapi-clients`                                                 |
 | Jwt\_\_TokenExpirationMinutes | Expiração                  | `60`                                                               |
-| RabbitMq\_\_HostName          | Host RabbitMQ              | `rabbit`                                                           |
-| RabbitMq\_\_UserName          | Usuário RabbitMQ           | `guest`                                                            |
-| RabbitMq\_\_Password          | Senha RabbitMQ             | `guest`                                                            |
+| RabbitMq\_\_Host              | Host RabbitMQ              | `rabbitmq`                                                         |
+| RabbitMq\_\_User              | Usuário RabbitMQ           | `guest`                                                            |
+| RabbitMq\_\_Pass              | Senha RabbitMQ             | `guest`                                                            |
 | ASPNETCORE_URLS (opcional)    | URL Kestrel                | `http://+:8080`                                                    |
 
 ---
@@ -230,7 +226,7 @@ docker compose logs -f api
 ## Licença & Versão
 
 - Licença: MIT
-- Versão: v1.2.0
+- Versão: v1.2.2
 
 ---
 
@@ -257,3 +253,15 @@ Desafio baseado em **Arlequim Stack — Desafio Técnico Backend**.
 - Nova seção de **Mensageria** no README.
 - Atualização do `docker-compose.yml` para incluir serviço RabbitMQ.
 - Variáveis de ambiente `RabbitMq__*` documentadas.
+
+### v1.2.1
+
+- Correção: uso de `NullMessageBus` nos testes para evitar falhas de conexão com RabbitMQ.
+- Ajustes no `Program.cs` para registrar RabbitMQ apenas fora de `Testing`.
+- Documentação atualizada para refletir `stock.events` + routing key `orders.created`.
+
+### v1.2.2
+
+- Release de correção de documentação e versionamento.
+- Ajuste do número da versão no README.
+- Alinhamento das notas de release com as versões publicadas no GitHub.
