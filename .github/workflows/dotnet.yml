@@ -43,21 +43,16 @@ jobs:
         run: dotnet build StockSolution.sln --no-restore -c Release
 
       - name: Test with coverage
-        run: |
-          dotnet test StockSolution.sln \
-            --no-build -c Release \
-            /p:CollectCoverage=true \
-            /p:CoverletOutput=./TestResults/coverage/ \
-            /p:CoverletOutputFormat='cobertura'
+        run: dotnet test --collect:"XPlat Code Coverage" --logger "trx;LogFileName=test_results.trx" --results-directory ./TestResults
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-cobertura
-          path: "**/TestResults/coverage/coverage.cobertura.xml"
+          name: coverage-report
+          path: TestResults/**/coverage.cobertura.xml
 
       - name: Upload test results (trx)
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: "**/TestResults/*.trx"
+          path: TestResults/*.trx

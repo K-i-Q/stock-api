@@ -8,6 +8,11 @@
 .vscode/
 .idea/
 
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
 *.pid
 docker-compose.override.yml
 
