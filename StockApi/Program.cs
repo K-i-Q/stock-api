@@ -17,14 +17,23 @@ using StockApi.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// RabbitMQ DI
-var mqHost = builder.Configuration["RabbitMq:Host"] ?? Environment.GetEnvironmentVariable("RabbitMq__Host") ?? "localhost";
-var mqUser = builder.Configuration["RabbitMq:User"] ?? Environment.GetEnvironmentVariable("RabbitMq__User") ?? "guest";
-var mqPass = builder.Configuration["RabbitMq:Pass"] ?? Environment.GetEnvironmentVariable("RabbitMq__Pass") ?? "guest";
+builder.Services.AddSingleton<IMessageBus, NullMessageBus>();
 
-builder.Services.AddSingleton<IMessageBus>(_ => new RabbitMqMessageBus(mqHost, mqUser, mqPass));
-builder.Services.AddHostedService<OrderCreatedConsumer>();
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    var mqHost = builder.Configuration["RabbitMq:Host"]
+                ?? Environment.GetEnvironmentVariable("RabbitMq__Host")
+                ?? "rabbitmq";
+    var mqUser = builder.Configuration["RabbitMq:User"]
+                ?? Environment.GetEnvironmentVariable("RabbitMq__User")
+                ?? "guest";
+    var mqPass = builder.Configuration["RabbitMq:Pass"]
+                ?? Environment.GetEnvironmentVariable("RabbitMq__Pass")
+                ?? "guest";
 
+    builder.Services.AddSingleton<IMessageBus>(_ => new RabbitMqMessageBus(mqHost, mqUser, mqPass));
+    builder.Services.AddHostedService<OrderCreatedConsumer>();
+}
 
 builder.Services.AddOpenTelemetry()
     .WithTracing(t => t
