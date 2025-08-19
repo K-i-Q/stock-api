@@ -8,6 +8,7 @@ using StockApi.Dtos;
 using StockApi.Models;
 using StockApi.Tests.Infra;
 using Xunit;
+using Microsoft.AspNetCore.Mvc;
 
 public class BranchCoverage_Extras_Tests : IClassFixture<CustomWebAppFactory>
 {
@@ -108,5 +109,75 @@ public class BranchCoverage_Extras_Tests : IClassFixture<CustomWebAppFactory>
 
         var s2 = await client.PostAsJsonAsync("/auth/signup", payload);
         Assert.Equal(HttpStatusCode.BadRequest, s2.StatusCode);
+    }
+
+    [Fact]
+    public async Task StockEntries_Post_ProductInexistente_400()
+    {
+        var client = _factory.CreateClient();
+
+        var adminToken = await TestAuth.SignupAndLoginAsync(client, UserRole.Admin);
+        UseBearer(client, adminToken);
+
+        var res = await client.PostAsJsonAsync("/stock/entries", new StockEntryRequest
+        {
+            ProductId = Guid.NewGuid(),
+            Quantity = 1,
+            InvoiceNumber = "NF-123"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+        var body = await res.Content.ReadAsStringAsync();
+        Assert.Contains("Product not found", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Auth_Signup_SenhaCurta_400()
+    {
+        var client = _factory.CreateClient();
+
+        var res = await client.PostAsJsonAsync("/auth/signup", new SignupRequest
+        {
+            Name = "Curta",
+            Email = "curta@local",
+            Password = "123", // < 6
+            Role = UserRole.Seller
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+        var body = await res.Content.ReadAsStringAsync();
+        Assert.Contains("at least 6", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Products_Post_PrecoZero_400_ProblemDetails()
+    {
+        var client = _factory.CreateClient();
+        var adminToken = await TestAuth.SignupAndLoginAsync(client, UserRole.Admin);
+        UseBearer(client, adminToken);
+
+        var res = await client.PostAsJsonAsync("/products", new ProductCreateRequest
+        {
+            Name = "Produto Zero",
+            Description = "desc",
+            Price = 0m
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+
+        var pd = await res.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.NotNull(pd);
+        Assert.True(pd!.Errors.ContainsKey("Price"));
+    }
+
+    [Fact]
+    public async Task Orders_Get_Inexistente_404()
+    {
+        var client = _factory.CreateClient();
+        var sellerToken = await TestAuth.SignupAndLoginAsync(client, UserRole.Seller);
+        UseBearer(client, sellerToken);
+
+        var res = await client.GetAsync($"/orders/{Guid.NewGuid()}");
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
     }
 }

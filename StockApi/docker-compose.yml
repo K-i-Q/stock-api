@@ -1,24 +1,41 @@
 services:
   db:
     image: postgres:16-alpine
+    container_name: stockapi-db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: stock
+      POSTGRES_PASSWORD: stock
       POSTGRES_DB: stockdb
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stock -d stockdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   api:
-    build: .
+    volumes:
+      - dataprotection:/root/.aspnet/DataProtection-Keys
+    build:
+      context: .          # <<-- a pasta onde ESTÃO o Dockerfile, Program.cs e StockApi.csproj
+      dockerfile: Dockerfile
+    container_name: stockapi
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
-      ConnectionStrings__Default: "Host=db;Port=5432;Username=postgres;Password=postgres;Database=stockdb"
-      Jwt__Key: ${JWT_KEY}
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: Host=db;Port=5432;Database=stockdb;Username=stock;Password=stock
+      Jwt__Key: ${JWT_KEY:-super-secret-key-change-me-please-32chars}
+      Jwt__Issuer: stockapi
+      Jwt__Audience: stockapi-clients
+      Jwt__TokenExpirationMinutes: "60"
     ports:
       - "8080:8080"
 
 volumes:
   pgdata:
+  dataprotection:

@@ -84,27 +84,25 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
+
 var app = builder.Build();
 
 app.UseExceptionHandler();
 
-// Swagger
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "StockApi v1");
-        c.RoutePrefix = "swagger";
-    });
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "StockApi v1");
+    c.RoutePrefix = "swagger";
+});
 
-if (!app.Environment.IsEnvironment("Testing"))
+if (app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => Results.Redirect("/swagger"));
+app.MapGet("/", () => Results.Redirect("/swagger", permanent: false));
 
 #region AUTH
 var auth = app.MapGroup("/auth");
@@ -309,8 +307,18 @@ orders.MapGet("/{id:guid}", async (Guid id, AppDbContext db) =>
 
 using (var scope = app.Services.CreateScope())
 {
+    var env = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.EnsureCreatedAsync();
+
+    if (env.IsEnvironment("Testing"))
+    {
+        await db.Database.EnsureCreatedAsync();
+    }
+    else
+    {
+        await db.Database.MigrateAsync();
+    }
+
     if (!await db.Users.AnyAsync())
     {
         db.Users.Add(new User

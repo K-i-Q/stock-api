@@ -1,11 +1,16 @@
-# build
+# =============== build ===============
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
-COPY . .
+
+# copie o csproj e restaure (cache melhor)
+COPY *.csproj ./
 RUN dotnet restore
+
+# copie o restante e publique
+COPY . .
 RUN dotnet publish -c Release -o /app
 
-# runtime
+# ============== runtime ==============
 FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
 COPY --from=build /app .

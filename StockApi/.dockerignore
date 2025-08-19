@@ -1,0 +1,26 @@
+# Pastas de build
+bin/
+obj/
+**/bin/
+**/obj/
+TestResults/
+coverage*/
+coveragereport/
+
+# Arquivos temporários
+*.user
+*.suo
+*.swp
+*.bak
+*.tmp
+*.log
+.coverageresults*
+
+# Git e IDEs
+.git
+.gitignore
+.vscode
+.idea
+
+# Arquivos de infra
+Dockerfile

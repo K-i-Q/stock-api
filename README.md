@@ -1,116 +1,229 @@
-StockApi
+StockApi — Gestão de Estoque e Produtos
 
-![.NET CI](https://github.com/K-i-Q/stock-api/actions/workflows/dotnet.yml/badge.svg)
+API em .NET para cadastro de usuários, autenticação JWT, catálogo de produtos, controle de estoque e emissão de pedidos.
 
-API de gestão de estoque e pedidos — .NET 9 + ASP.NET Core (Minimal APIs) + EF Core + PostgreSQL + JWT.
-Testes com xUnit e EF Core InMemory. Contêiner com Docker e orquestração com Docker Compose.
+Sumário
+• Stack
+• Arquitetura & Decisões
+• Como rodar (Docker)
+• Como rodar (sem Docker)
+• Banco de dados & Migrações
+• Fluxo completo (H1 → H5)
+• Endpoints
+• Testes
+• Variáveis de ambiente
+• Troubleshooting
+• Bônus / Observabilidade (opcional)
 
 ⸻
 
-🚀 Requisitos
-• .NET 9 SDK
-• Docker (opcional, recomendado)
-• PostgreSQL (se rodar local sem Docker)
+Stack
+• .NET 9 (Minimal APIs)
+• Entity Framework Core 9
+• PostgreSQL 16 (Docker)
+• JWT (Microsoft.AspNetCore.Authentication.JwtBearer)
+• Swagger / OpenAPI
+• xUnit (integração + cobertura)
 
 ⸻
 
-▶️ Rodar com Docker Compose (recomendado)
+Arquitetura & Decisões
+• Minimal API para velocidade e clareza no desafio.
+• EF Core com Npgsql; em produção aplica MigrateAsync() ao subir; em testes usa InMemory.
+• JWT para autenticação; políticas:
+• AdminOnly → escreve em produtos e estoque
+• SellerOrAdmin → cria pedidos e consulta pedidos
+• Tratamento de erros com ProblemDetails nas validações de modelo; retornos 400/401/403/404 com mensagens claras.
+• Swagger para auto-descoberta dos endpoints.
+• Seed: cria um usuário admin@local / admin123 se o banco estiver vazio.
 
-cd StockApi
+⸻
 
-# necessário ter um arquivo .env na raiz do repo com JWT_KEY=<chave>
+Como rodar (Docker)
+
+Pré-requisitos: Docker Desktop.
+
+# na pasta StockApi/ (onde está Dockerfile e docker-compose.yml)
 
 docker compose up --build
 
     •	API: http://localhost:8080/swagger
-    •	Seed automático: admin@local / admin123
+
+Observação: a UI do Swagger fica em /swagger. A raiz / redireciona para /swagger.
+
+Variáveis usadas no compose:
+• ConnectionStrings**Default=Host=db;Port=5432;Database=stockdb;Username=stock;Password=stock
+• Jwt**Key (default no compose: super-secret-key-change-me-please-32chars)
+• Jwt**Issuer=stockapi, Jwt**Audience=stockapi-clients, Jwt\_\_TokenExpirationMinutes=60
 
 ⸻
 
-▶️ Rodar local (sem Docker)
+Como rodar (sem Docker) 1. Suba um Postgres local (porta 5432) e crie o DB stockdb. 2. Configure appsettings.Development.json ou variáveis de ambiente:
 
-dotnet run --project StockApi
+ConnectionStrings**Default="Host=localhost;Port=5432;Database=stockdb;Username=postgres;Password=postgres"
+Jwt**Key="uma-chave-de-32+ caracteres"
+Jwt**Issuer="stockapi"
+Jwt**Audience="stockapi-clients"
+Jwt\_\_TokenExpirationMinutes="60"
 
-    •	API: http://localhost:5000/swagger (ou 5001 https)
+    3.	Rode:
 
-Ajuste appsettings.json se necessário.
+dotnet restore
+dotnet run
 
-⸻
-
-🔑 Autenticação
-• POST /auth/login → retorna { token }
-• No Swagger, clique em Authorize e cole apenas o token (sem Bearer ).
-
-⸻
-
-📌 Endpoints principais
-• POST /auth/signup (Admin/Seller)
-• POST /auth/login
-• GET /products (auth)
-• GET /products/{id} (auth)
-• POST /products, PUT /products/{id}, DELETE /products/{id} (Admin)
-• POST /stock/entries (Admin) → adiciona quantidade + nº da nota fiscal
-• POST /orders (Seller/Admin) → valida estoque e baixa automaticamente
-• GET /orders/{id} (auth)
+    •	Swagger: http://localhost:5189/swagger (ou porta informada no console)
 
 ⸻
 
-🧪 Testes
+Banco de dados & Migrações
+• Produção (Docker): Program.cs chama db.Database.MigrateAsync() ao subir.
+• Testes: usa InMemory.
+• Para criar/atualizar migrações localmente:
 
-dotnet test
-
-Exemplo de saída:
-
-total: 4, failed: 0, succeeded: 4
-
-⸻
-
-🗄️ Migrations (EF Core)
-
-dotnet ef migrations add <Nome>
-dotnet ef database update
+dotnet ef migrations add MinhaMigracao -s StockApi -p StockApi
+dotnet ef database update -s StockApi -p StockApi
 
 ⸻
 
-🔐 Notas de segurança
-• Nunca comitar segredos. Use .env (já ignorado no .gitignore) e variáveis de ambiente.
-• Em produção, use uma chave JWT ≥ 256 bits e rotação periódica.
+Fluxo completo (H1 → H5)
 
-⸻
+Use os exemplos abaixo (cURL).
+Dica: exporte o token após o login para facilitar.
 
-📖 Exemplos práticos (curl)
+1. H1 — Cadastro de usuário (Admin ou Seller)
 
-1. Login
-
-curl -X POST http://localhost:8080/auth/login \
+curl -X POST http://localhost:8080/auth/signup \
  -H "Content-Type: application/json" \
- -d '{
-"email": "admin@local",
-"password": "admin123"
-}'
+ -d '{ "name":"Admin", "email":"admin@local", "password":"admin123", "role": "Admin" }'
 
-Resposta esperada:
+2. H2 — Login (recebe token)
 
-{
-"token": "eyJhbGciOi..."
-}
+TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+ -H "Content-Type: application/json" \
+ -d '{ "email":"admin@local", "password":"admin123" }' | jq -r .token)
+echo $TOKEN
 
-2. Criar produto (Admin)
+3. H3 — Produtos (Admin)
+
+Criar
 
 curl -X POST http://localhost:8080/products \
+ -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+ -d '{ "name":"Bola", "description":"Futebol", "price": 99.90 }'
+
+Listar
+
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/products
+
+4. H4 — Adicionar estoque (Admin)
+
+Substitua PRODUCT_ID pelo Id retornado ao criar o produto.
+
+curl -X POST http://localhost:8080/stock/entries \
+ -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+ -d '{ "productId":"PRODUCT_ID", "quantity": 10, "invoiceNumber":"NF-001" }'
+
+5. H5 — Emissão de pedido (Seller ou Admin)
+
+Crie um vendedor e faça login para obter TOKEN_SELLER, ou use o admin.
+
+# (opcional) criar seller
+
+curl -X POST http://localhost:8080/auth/signup \
  -H "Content-Type: application/json" \
- -H "Authorization: Bearer <TOKEN_AQUI>" \
+ -d '{ "name":"Vendedor", "email":"seller@local", "password":"seller123", "role": "Seller" }'
+
+TOKEN_SELLER=$(curl -s -X POST http://localhost:8080/auth/login \
+ -H "Content-Type: application/json" \
+ -d '{ "email":"seller@local", "password":"seller123" }' | jq -r .token)
+
+# criar pedido (baixa automática de estoque)
+
+curl -X POST http://localhost:8080/orders \
+ -H "Authorization: Bearer $TOKEN_SELLER" -H "Content-Type: application/json" \
  -d '{
-"name": "Notebook Dell",
-"price": 4500.00,
-"stock": 10
+"customerDocument": "12345678900",
+"sellerName": "Carlos",
+"items": [
+{ "productId": "PRODUCT_ID", "quantity": 2 }
+]
 }'
 
-Resposta esperada:
+Se algum produto não tiver estoque suficiente, retorna 400 com mensagem de erro.
 
-{
-"id": 38dafa76-ff4b-4241-82bb-f95f8aed1aae,
-"name": "Notebook Dell",
-"price": 4500.0,
-"stock": 10
-}
+⸻
+
+Endpoints
+
+Auth
+• POST /auth/signup → cria usuário (Admin/Seller). Regras: e-mail único, senha ≥ 6.
+• POST /auth/login → retorna { token, email, role }.
+
+Produtos
+• GET /products → lista (auth requerida).
+• GET /products/{id} → consulta (auth).
+• POST /products → cria (Admin).
+• PUT /products/{id} → edita (Admin).
+• DELETE /products/{id} → exclui (Admin).
+
+Estoque
+• POST /stock/entries → adiciona entrada com quantity e invoiceNumber (Admin).
+
+Pedidos
+• POST /orders → cria pedido (Seller/Admin).
+• Valida itens, existência dos produtos e estoque.
+• Dá baixa no estoque.
+• GET /orders/{id} → consulta pedido.
+
+⸻
+
+Testes
+
+Rodar todos os testes e gerar cobertura (usando script do projeto):
+
+cd StockApi.Tests
+./coverage.sh
+
+Saída esperada:
+• Line coverage alta (≈ 90%+)
+• Branch coverage cobrindo regras principais (validações de auth, produtos, estoque e pedidos)
+
+⸻
+
+Variáveis de ambiente
+
+Nome Descrição Exemplo
+ConnectionStrings**Default string de conexão Postgres Host=db;Port=5432;Database=stockdb;Username=stock;Password=stock
+Jwt**Key chave secreta JWT (≥ 32 bytes; código aplica padding se menor) super-secret-key-change-me-please-32chars
+Jwt**Issuer issuer do token stockapi
+Jwt**Audience audience do token stockapi-clients
+Jwt\_\_TokenExpirationMinutes minutos de expiração 60
+ASPNETCORE_URLS (opcional) URL Kestrel http://+:8080
+
+Em Testing, o app usa InMemory; em Produção, usa Postgres + migrações automáticas.
+
+⸻
+
+Troubleshooting
+• Swagger não abre
+Verifique: http://localhost:8080/swagger.
+Confirme que o container api está listening on http://[::]:8080 no log.
+• Erro de HTTPS redirect em Docker
+Em produção a app não força HTTPS. Se estiver forçando, garanta que UseHttpsRedirection() só roda em Development.
+• PendingModelChangesWarning
+Em Docker, ao subir a primeira vez, a app aplica MigrateAsync(). Se alterar modelo, gere nova migração local e re-build:
+
+dotnet ef migrations add Nova
+docker compose up --build
+
+    •	JWT inválido / 401
+
+Confirme que está enviando Authorization: Bearer <TOKEN> e que o token corresponde ao usuário com permissão.
+
+⸻
+
+Bônus / Observabilidade (opcional)
+
+Se desejar habilitar tracing/APM:
+• Adicionar OpenTelemetry (traces + logs) e um backend (Jaeger/Zipkin).
+• Incluir um serviço Jaeger no docker-compose e instrumentar middlewares (requests, EFCore).
