@@ -89,7 +89,7 @@ var app = builder.Build();
 app.UseExceptionHandler();
 
 // Swagger
-if (app.Environment.IsDevelopment() || true)
+if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>

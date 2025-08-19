@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using StockApi.Dtos;
 using StockApi.Models;
 using StockApi.Tests.Infra;
@@ -13,7 +14,7 @@ public class ProductsEndpointsTests : IClassFixture<CustomWebAppFactory>
 
     private static async Task<string> LoginAsAdmin(HttpClient client)
     {
-        await client.PostAsJsonAsync("/auth/signup", new SignupRequest
+        var rSignup = await client.PostAsJsonAsync("/auth/signup", new SignupRequest
         {
             Name = "Admin1",
             Email = "admin1@local",
@@ -21,13 +22,24 @@ public class ProductsEndpointsTests : IClassFixture<CustomWebAppFactory>
             Role = UserRole.Admin
         });
 
+        Assert.True(rSignup.StatusCode is HttpStatusCode.Created or HttpStatusCode.BadRequest,
+            $"Signup falhou: {(int)rSignup.StatusCode} {rSignup.StatusCode}. Body: {await rSignup.Content.ReadAsStringAsync()}");
+
         var r = await client.PostAsJsonAsync("/auth/login", new LoginRequest
         {
             Email = "admin1@local",
             Password = "admin123"
         });
-        var data = await r.Content.ReadFromJsonAsync<LoginResponse>();
-        return data!.Token;
+
+        var body = await r.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+
+        var data = JsonSerializer.Deserialize<LoginResponse>(body,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(data);
+        Assert.False(string.IsNullOrWhiteSpace(data!.Token));
+        return data.Token;
     }
 
     [Fact]
