@@ -17,8 +17,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenTelemetry()
     .WithTracing(t => t
-        .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("StockApi"))
-        .AddAspNetCoreInstrumentation()
+        .SetResourceBuilder(
+            ResourceBuilder.CreateDefault().AddService("StockApi"))
+        .SetSampler(new AlwaysOnSampler())
+        .AddAspNetCoreInstrumentation(o =>
+        {
+            o.RecordException = true;
+        })
         .AddHttpClientInstrumentation()
         .AddSource("StockApi")
         .AddConsoleExporter());
@@ -113,6 +118,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/", () => Results.Redirect("/swagger", permanent: false));
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
+   .AllowAnonymous();
 
 #region AUTH
 var auth = app.MapGroup("/auth");

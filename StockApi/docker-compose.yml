@@ -18,14 +18,14 @@ services:
 
   api:
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/swagger/v1/swagger.json >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 10
     volumes:
       - dataprotection:/root/.aspnet/DataProtection-Keys
     build:
-      context: .         
+      context: .
       dockerfile: Dockerfile
     container_name: stockapi
     depends_on:
