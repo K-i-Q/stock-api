@@ -80,7 +80,6 @@ public class OrderTests
     [Fact]
     public async Task DeductsStock_WhenOrderIsConfirmed()
     {
-        // arrange
         using var db = NewMemDb(nameof(DeductsStock_WhenOrderIsConfirmed));
 
         var prod = new Product
@@ -94,14 +93,12 @@ public class OrderTests
         db.Products.Add(prod);
         await db.SaveChangesAsync();
 
-        // act
         var order = await PlaceOrderAsync(db, "123.456.789-00", "Carlos",
             new[] { (prod.Id, 3) });
 
-        // assert
         var updated = await db.Products.FindAsync(prod.Id);
         Assert.NotNull(updated);
-        Assert.Equal(7, updated!.Stock); // 10 - 3
+        Assert.Equal(7, updated!.Stock);
 
         Assert.Single(order.Items);
         Assert.Equal(3, order.Items[0].Quantity);
@@ -112,7 +109,6 @@ public class OrderTests
     [Fact]
     public async Task Throws_WhenStockIsInsufficient()
     {
-        // arrange
         using var db = NewMemDb(nameof(Throws_WhenStockIsInsufficient));
 
         var prod = new Product
@@ -126,14 +122,12 @@ public class OrderTests
         db.Products.Add(prod);
         await db.SaveChangesAsync();
 
-        // act + assert
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             PlaceOrderAsync(db, "999.999.999-99", "Vendedor",
-                new[] { (prod.Id, 5) })); // pede mais do que há
+                new[] { (prod.Id, 5) }));
 
         Assert.Contains("Insufficient stock", ex.Message);
 
-        // estoque deve permanecer inalterado
         var unchanged = await db.Products.FindAsync(prod.Id);
         Assert.Equal(2, unchanged!.Stock);
     }
