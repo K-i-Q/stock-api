@@ -13,6 +13,13 @@ using System.Security.Cryptography;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddOpenTelemetry()
+    .WithTracing(t => t
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddSource("StockApi")
+        .AddConsoleExporter());
+
 builder.Services.AddProblemDetails();
 
 // DB

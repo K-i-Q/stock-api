@@ -48,6 +48,52 @@ public class BranchCoverage_Extras_Tests : IClassFixture<CustomWebAppFactory>
     }
 
     [Fact]
+    public async Task Orders_Post_Sucesso_DeveBaixarEstoque()
+    {
+        var client = _factory.CreateClient();
+
+        var adminToken = await TestAuth.SignupAndLoginAsync(client, UserRole.Admin);
+        client.UseBearer(adminToken);
+
+        var cres = await client.PostAsJsonAsync("/products", new ProductCreateRequest
+        {
+            Name = "Produto Pedido OK",
+            Price = 100m,
+            Description = "Teste"
+        });
+        cres.EnsureSuccessStatusCode();
+        var p = await cres.Content.ReadFromJsonAsync<Product>();
+        Assert.NotNull(p);
+
+        var sres = await client.PostAsJsonAsync("/stock/entries", new StockEntryRequest
+        {
+            ProductId = p!.Id,
+            Quantity = 10,
+            InvoiceNumber = "NF-123"
+        });
+        sres.EnsureSuccessStatusCode();
+
+        var sellerToken = await TestAuth.SignupAndLoginAsync(client, UserRole.Seller);
+        client.UseBearer(sellerToken);
+
+        var ores = await client.PostAsJsonAsync("/orders", new CreateOrderRequest
+        {
+            CustomerDocument = "000.111.222-33",
+            SellerName = "Vendedor X",
+            Items = new() { new CreateOrderItemRequest { ProductId = p.Id, Quantity = 3 } }
+        });
+        Assert.Equal(HttpStatusCode.Created, ores.StatusCode);
+
+        client.UseBearer(adminToken);
+        var get = await client.GetAsync($"/products/{p.Id}");
+        get.EnsureSuccessStatusCode();
+
+        var atualizado = await get.Content.ReadFromJsonAsync<Product>();
+        Assert.NotNull(atualizado);
+        Assert.Equal(7, atualizado!.Stock);
+    }
+
+    [Fact]
     public async Task Root_DeveResponder_OK_ou_RedirecionarParaSwagger()
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions

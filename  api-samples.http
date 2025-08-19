@@ -1,0 +1,54 @@
+### Signup ADMIN
+POST http://localhost:8080/auth/signup
+Content-Type: application/json
+
+{
+  "name": "Admin",
+  "email": "admin@local",
+  "password": "admin123",
+  "role": 0
+}
+
+### Login
+POST http://localhost:8080/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@local",
+  "password": "admin123"
+}
+
+### Criar produto (usar token Bearer)
+POST http://localhost:8080/products
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Bola",
+  "description": "Futebol",
+  "price": 99.9
+}
+
+### Adicionar estoque
+POST http://localhost:8080/stock/entries
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "quantity": 10,
+  "invoiceNumber": "NF-001"
+}
+
+### Criar pedido (seller/admin)
+POST http://localhost:8080/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "customerDocument": "123",
+  "sellerName": "Carlos",
+  "items": [
+    { "productId": "{{productId}}", "quantity": 2 }
+  ]
+}
