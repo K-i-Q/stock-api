@@ -239,8 +239,8 @@ O relatório HTML é gerado em `StockApi.Tests/TestResults/**/report/index.html`
 | Jwt\_\_Audience               | Audience                   | `stockapi-clients`                                                 |
 | Jwt\_\_TokenExpirationMinutes | Expiração                  | `60`                                                               |
 | RabbitMq\_\_Host              | Host RabbitMQ              | `rabbitmq`                                                         |
-| RabbitMq\_\_User              | Usuário RabbitMQ           | `guest`                                                            |
-| RabbitMq\_\_Pass              | Senha RabbitMQ             | `guest`                                                            |
+| RabbitMq\_\_User              | Usuário RabbitMQ           | `stock`                                                            |
+| RabbitMq\_\_Pass              | Senha RabbitMQ             | `stock`                                                            |
 | RabbitMq\_\_Disabled          | Desliga mensageria (tests) | `true`                                                             |
 | ASPNETCORE_URLS (opcional)    | URL Kestrel                | `http://+:8080`                                                    |
 
