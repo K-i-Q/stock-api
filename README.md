@@ -6,6 +6,8 @@
 
 API em .NET 9 (Minimal APIs) para cadastro de usuários, autenticação JWT, catálogo de produtos, controle de estoque, emissão de pedidos e mensageria com RabbitMQ — pronta para rodar em Docker e com testes automatizados.
 
+**Domínio escolhido:** equipamentos esportivos (genérico o suficiente para outros domínios do enunciado).
+
 ---
 
 ## Sumário
@@ -48,7 +50,7 @@ API em .NET 9 (Minimal APIs) para cadastro de usuários, autenticação JWT, cat
 ## Arquitetura & Decisões
 
 - **Minimal API**: favorece clareza e velocidade.
-- **EF Core**: `Database.MigrateAsync()` no startup; InMemory em `Testing`.
+- **EF Core**: `Database.MigrateAsync()` no startup; InMemory em Testing.
 - **JWT**: políticas de autorização por perfil.
   - `AdminOnly` → escrever em Produtos e Estoque
   - `SellerOrAdmin` → criar/ler Pedidos
@@ -61,7 +63,6 @@ API em .NET 9 (Minimal APIs) para cadastro de usuários, autenticação JWT, cat
   - mensagens claras para regras de negócio.
 - **Swagger**: sempre habilitado em `/swagger`.
 - **Seed**: cria usuário `admin@local / admin123` se o banco estiver vazio.
-- **Testing estável**: mensageria desabilitada por padrão no ambiente de testes (`RabbitMq__Disabled=true`).
 
 ---
 
@@ -69,7 +70,7 @@ API em .NET 9 (Minimal APIs) para cadastro de usuários, autenticação JWT, cat
 
 ```
 StockApi/            # API (Minimal APIs)
-StockApi.Tests/      # Testes de integração e unitários (xUnit)
+StockApi.Tests/      # Testes de integração (xUnit)
 .github/workflows/   # CI (GitHub Actions)
 api-samples.http     # Coleção de requests (VS Code/.http)
 Dockerfile           # Build da API
@@ -85,12 +86,12 @@ README.md            # Este arquivo
 
 ```bash
 git clone https://github.com/K-i-Q/stock-api.git
-cd stock-api
+cd stock-api/StockApi
 docker compose up --build
 ```
 
-- API: http://localhost:8080/swagger
-- RabbitMQ Management: http://localhost:15672 (guest/guest)
+- API: [http://localhost:8080/swagger](http://localhost:8080/swagger)
+- RabbitMQ Management: [http://localhost:15672](http://localhost:15672) (guest/guest)
 - Healthcheck: `/swagger/v1/swagger.json`
 
 Variáveis usadas no compose:
@@ -101,8 +102,8 @@ Variáveis usadas no compose:
 - `Jwt__Audience=stockapi-clients`
 - `Jwt__TokenExpirationMinutes=60`
 - `RabbitMq__Host=rabbitmq`
-- `RabbitMq__User=stock`
-- `RabbitMq__Pass=stock`
+- `RabbitMq__User=guest`
+- `RabbitMq__Pass=guest`
 
 ---
 
@@ -125,20 +126,20 @@ Variáveis usadas no compose:
   },
   "RabbitMq": {
     "Host": "localhost",
-    "User": "stock",
-    "Pass": "stock"
+    "User": "guest",
+    "Pass": "guest"
   }
 }
 ```
 
-4. Rode a aplicação:
+3. Rode a aplicação:
 
 ```bash
 dotnet restore
 dotnet run --project StockApi/StockApi.csproj
 ```
 
-Swagger: http://localhost:5189/swagger
+Swagger: [http://localhost:5189/swagger](http://localhost:5189/swagger)
 
 ---
 
@@ -185,7 +186,7 @@ No `/auth/signup`, envie role como string ("Admin" ou "Seller").
 
 1. Rodar API + RabbitMQ via Docker.
 2. Criar pedido (`POST /orders`).
-3. Verificar fila no painel http://localhost:15672.
+3. Verificar fila no painel [http://localhost:15672](http://localhost:15672).
 4. Logs da API exibem consumo:
 
 ```bash
@@ -196,36 +197,96 @@ docker compose logs -f api
 
 ## Endpoints
 
-(... permanece igual ...)
+- `POST /auth/signup` — criar usuário
+- `POST /auth/login` — autenticação
+- `GET /products` — listar produtos
+- `POST /products` — criar produto (Admin)
+- `PUT /products/{id}` — atualizar produto (Admin)
+- `DELETE /products/{id}` — remover produto (Admin)
+- `POST /stock/entries` — adicionar estoque (Admin)
+- `POST /orders` — criar pedido (Seller ou Admin)
+- `GET /orders/{id}` — consultar pedido (Seller ou Admin)
+
+---
+
+## Exemplos de Requests (cURL)
+
+```bash
+# Criar usuário
+curl -X POST http://localhost:8080/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@local","password":"admin123","role":"Admin"}'
+
+# Login
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@local","password":"admin123"}'
+
+# Criar produto
+curl -X POST http://localhost:8080/products \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Bola de Futebol","description":"Oficial","price":199.99}'
+
+# Adicionar estoque
+curl -X POST http://localhost:8080/stock/entries \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"productId":"<guid>","quantity":10}'
+
+# Criar pedido
+curl -X POST http://localhost:8080/orders \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"productId":"<guid>","quantity":2}'
+```
+
+---
+
+## Guia de QA (H1 → H5)
+
+- **H1**: Criar produto com preço negativo → retorna 400 + `ValidationProblemDetails`.
+- **H2**: Criar pedido sem estoque → retorna erro de regra de negócio.
+- **H3**: Usuário comum criando produto → 403 Forbidden.
+- **H4**: JWT inválido → 401 Unauthorized.
+- **H5**: Pedido criado deve publicar mensagem em `stock.events`.
 
 ---
 
 ## Testes Automatizados
 
-- Testes de **integração** (xUnit) exercitam endpoints reais com autenticação JWT.
-- Testes **unitários** cobrem regras de domínio e geração de JWT.
-- Mensageria é desabilitada em `Testing` via `RabbitMq__Disabled=true`.
-- Cobertura de código com script auxiliar:
+- xUnit para testes de integração (API + DB InMemory).
+- `coverage.sh` gera relatório com `dotnet test` + `coverlet` + `reportgenerator`.
+- Expectativa: cobertura **≥ 90% linhas** e validação de cenários críticos (branch coverage).
 
 ```bash
-cd StockApi.Tests
 ./coverage.sh
+open ./coverage/index.html
 ```
-
-O relatório HTML é gerado em `StockApi.Tests/TestResults/**/report/index.html`.
 
 ---
 
 ## Observabilidade / Tracing (OpenTelemetry)
 
-- Exportador console habilitado em `Development`.
-- Traços para requisições HTTP e ASP.NET.
+- ASP.NET Core requests instrumentados.
+- `HttpClient` instrumentado.
+- Exportador Console habilitado.
+- Exemplo: acompanhar logs com:
+
+```bash
+docker compose logs -f api
+```
 
 ---
 
 ## CI (GitHub Actions)
 
-- Workflow `.github/workflows/dotnet.yml` executa build, testes e publica cobertura no Codecov.
+- Workflow em `.github/workflows/dotnet.yml`:
+  - Restauração
+  - Build
+  - Execução de testes
+  - Geração de cobertura (TRX + cobertura)
+  - Upload para Codecov
 
 ---
 
@@ -239,9 +300,8 @@ O relatório HTML é gerado em `StockApi.Tests/TestResults/**/report/index.html`
 | Jwt\_\_Audience               | Audience                   | `stockapi-clients`                                                 |
 | Jwt\_\_TokenExpirationMinutes | Expiração                  | `60`                                                               |
 | RabbitMq\_\_Host              | Host RabbitMQ              | `rabbitmq`                                                         |
-| RabbitMq\_\_User              | Usuário RabbitMQ           | `stock`                                                            |
-| RabbitMq\_\_Pass              | Senha RabbitMQ             | `stock`                                                            |
-| RabbitMq\_\_Disabled          | Desliga mensageria (tests) | `true`                                                             |
+| RabbitMq\_\_User              | Usuário RabbitMQ           | `guest`                                                            |
+| RabbitMq\_\_Pass              | Senha RabbitMQ             | `guest`                                                            |
 | ASPNETCORE_URLS (opcional)    | URL Kestrel                | `http://+:8080`                                                    |
 
 ---
@@ -251,14 +311,14 @@ O relatório HTML é gerado em `StockApi.Tests/TestResults/**/report/index.html`
 - Swagger não abre → confira logs do container.
 - 401 → verifique token e permissões.
 - PendingModelChangesWarning → gere nova migração.
-- Mensagens não aparecem → verifique se `RabbitMq__*` estão corretas e se o consumer está ativo.
+- Mensagens não aparecem → verifique se `RabbitMq__*` estão corretos e consumer está ativo.
 
 ---
 
 ## Licença & Versão
 
 - Licença: MIT
-- Versão: v1.3.0
+- Versão: v1.2.2
 
 ---
 
@@ -270,24 +330,14 @@ Desafio baseado em **Arlequim Stack — Desafio Técnico Backend**.
 
 ## Release Notes
 
-### v1.3.0
+### v1.0.0
 
-- Testes: suíte estabilizada com cenários de _binding_ inválido e rota/body mismatch.
-- Infra de testes: desabilita RabbitMQ via `RabbitMq__Disabled=true`.
-- Correções nos DTOs utilizados nos testes de integração.
-- README reorganizado e ampliado (seções de testes e variáveis).
+- Primeira versão com CRUD de produtos, estoque e pedidos.
 
-### v1.2.2
+### v1.1.0
 
-- Correções de documentação e versionamento.
-- Ajuste do número da versão no README.
-- Alinhamento das notas de release com as versões publicadas no GitHub.
-
-### v1.2.1
-
-- Correção: uso de `NullMessageBus` nos testes para evitar falhas de conexão com RabbitMQ.
-- Ajustes no `Program.cs` para registrar RabbitMQ apenas fora de `Testing`.
-- Documentação atualizada para refletir `stock.events` + routing key `orders.created`.
+- Inclusão de testes automatizados (xUnit).
+- Cobertura integrada com Codecov.
 
 ### v1.2.0
 
@@ -296,11 +346,21 @@ Desafio baseado em **Arlequim Stack — Desafio Técnico Backend**.
 - Atualização do `docker-compose.yml` para incluir serviço RabbitMQ.
 - Variáveis de ambiente `RabbitMq__*` documentadas.
 
-### v1.1.0
+### v1.2.1
 
-- Inclusão de testes automatizados (xUnit).
-- Cobertura integrada com Codecov.
+- Correção: uso de `NullMessageBus` nos testes para evitar falhas de conexão com RabbitMQ.
+- Ajustes no `Program.cs` para registrar RabbitMQ apenas fora de `Testing`.
+- Documentação atualizada para refletir `stock.events` + routing key `orders.created`.
 
-### v1.0.0
+### v1.2.2
 
-- Primeira versão com CRUD de produtos, estoque e pedidos.
+- Release de correção de documentação e versionamento.
+- Ajuste do número da versão no README.
+- Alinhamento das notas de release com as versões publicadas no GitHub.
+
+### v1.3.0
+
+- Validações de rota: agora o `PUT /products/{id}` retorna **400 BadRequest** quando o `id` da rota difere do corpo.
+- Validações de binding: requisições com **GUID inválido** em `/products/{id}` e `/orders/{id}` retornam **400 BadRequest** (antes eram 404).
+- Melhoria nos testes de integração cobrindo cenários de inconsistência de rota e binding inválido.
+- Atualização do README para refletir novos comportamentos de validação.
