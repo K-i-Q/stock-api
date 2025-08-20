@@ -125,8 +125,8 @@ Variáveis usadas no compose:
   },
   "RabbitMq": {
     "Host": "localhost",
-    "User": "guest",
-    "Pass": "guest"
+    "User": "stock",
+    "Pass": "stock"
   }
 }
 ```
