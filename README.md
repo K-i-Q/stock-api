@@ -101,8 +101,8 @@ Variáveis usadas no compose:
 - `Jwt__Audience=stockapi-clients`
 - `Jwt__TokenExpirationMinutes=60`
 - `RabbitMq__Host=rabbitmq`
-- `RabbitMq__User=guest`
-- `RabbitMq__Pass=guest`
+- `RabbitMq__User=stock`
+- `RabbitMq__Pass=stock`
 
 ---
 
