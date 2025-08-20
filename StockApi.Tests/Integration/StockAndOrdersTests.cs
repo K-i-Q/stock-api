@@ -6,6 +6,8 @@ using StockApi.Models;
 using StockApi.Tests.Infra;
 using Xunit;
 
+namespace StockApi.Tests.Integration;
+
 public class StockAndOrdersTests : IClassFixture<CustomWebAppFactory>
 {
     private readonly CustomWebAppFactory _factory;
@@ -13,13 +15,7 @@ public class StockAndOrdersTests : IClassFixture<CustomWebAppFactory>
 
     private static async Task<string> LoginAs(HttpClient client, UserRole role, string email)
     {
-        await client.PostAsJsonAsync("/auth/signup", new SignupRequest
-        {
-            Name = role.ToString(),
-            Email = email,
-            Password = "pass123",
-            Role = role
-        });
+        await client.PostAsJsonAsync("/auth/signup", new SignupRequest { Name = role.ToString(), Email = email, Password = "pass123", Role = role });
         var r = await client.PostAsJsonAsync("/auth/login", new LoginRequest { Email = email, Password = "pass123" });
         var data = await r.Content.ReadFromJsonAsync<LoginResponse>();
         return data!.Token;
@@ -36,7 +32,7 @@ public class StockAndOrdersTests : IClassFixture<CustomWebAppFactory>
         var createProduct = new ProductCreateRequest { Name = "Raquete", Description = "Tênis", Price = 300m };
         var rp = await client.PostAsJsonAsync("/products", createProduct);
         rp.EnsureSuccessStatusCode();
-        var prod = await rp.Content.ReadFromJsonAsync<ProductDto>();
+        var prod = await rp.Content.ReadFromJsonAsync<Product>();
 
         var stockReq = new StockEntryRequest { ProductId = prod!.Id, Quantity = 10, InvoiceNumber = "NF-123" };
         var rs = await client.PostAsJsonAsync("/stock/entries", stockReq);
@@ -57,7 +53,7 @@ public class StockAndOrdersTests : IClassFixture<CustomWebAppFactory>
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
         var rGet = await client.GetAsync($"/products/{prod.Id}");
         rGet.EnsureSuccessStatusCode();
-        var after = await rGet.Content.ReadFromJsonAsync<ProductDto>();
+        var after = await rGet.Content.ReadFromJsonAsync<Product>();
         Assert.Equal(7, after!.Stock);
     }
 
@@ -68,10 +64,9 @@ public class StockAndOrdersTests : IClassFixture<CustomWebAppFactory>
         var adminToken = await LoginAs(client, UserRole.Admin, "admin3@local");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
 
-        var rp = await client.PostAsJsonAsync("/products",
-            new ProductCreateRequest { Name = "Bola Vôlei", Price = 150m });
+        var rp = await client.PostAsJsonAsync("/products", new ProductCreateRequest { Name = "Bola Vôlei", Price = 150m });
         rp.EnsureSuccessStatusCode();
-        var prod = await rp.Content.ReadFromJsonAsync<ProductDto>();
+        var prod = await rp.Content.ReadFromJsonAsync<Product>();
 
         var sellerToken = await LoginAs(client, UserRole.Seller, "seller2@local");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", sellerToken);

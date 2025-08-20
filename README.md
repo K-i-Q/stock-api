@@ -28,6 +28,7 @@ API em .NET 9 (Minimal APIs) para cadastro de usuários, autenticação JWT, cat
 - [Troubleshooting](#troubleshooting)
 - [Licença & Versão](#licença--versão)
 - [Créditos](#créditos)
+- [Release Notes](#release-notes)
 
 ---
 
@@ -47,7 +48,7 @@ API em .NET 9 (Minimal APIs) para cadastro de usuários, autenticação JWT, cat
 ## Arquitetura & Decisões
 
 - **Minimal API**: favorece clareza e velocidade.
-- **EF Core**: `Database.MigrateAsync()` no startup; InMemory em Testing.
+- **EF Core**: `Database.MigrateAsync()` no startup; InMemory em `Testing`.
 - **JWT**: políticas de autorização por perfil.
   - `AdminOnly` → escrever em Produtos e Estoque
   - `SellerOrAdmin` → criar/ler Pedidos
@@ -60,6 +61,7 @@ API em .NET 9 (Minimal APIs) para cadastro de usuários, autenticação JWT, cat
   - mensagens claras para regras de negócio.
 - **Swagger**: sempre habilitado em `/swagger`.
 - **Seed**: cria usuário `admin@local / admin123` se o banco estiver vazio.
+- **Testing estável**: mensageria desabilitada por padrão no ambiente de testes (`RabbitMq__Disabled=true`).
 
 ---
 
@@ -67,7 +69,7 @@ API em .NET 9 (Minimal APIs) para cadastro de usuários, autenticação JWT, cat
 
 ```
 StockApi/            # API (Minimal APIs)
-StockApi.Tests/      # Testes de integração (xUnit)
+StockApi.Tests/      # Testes de integração e unitários (xUnit)
 .github/workflows/   # CI (GitHub Actions)
 api-samples.http     # Coleção de requests (VS Code/.http)
 Dockerfile           # Build da API
@@ -83,12 +85,12 @@ README.md            # Este arquivo
 
 ```bash
 git clone https://github.com/K-i-Q/stock-api.git
-cd stock-api/StockApi
+cd stock-api
 docker compose up --build
 ```
 
-- API: [http://localhost:8080/swagger](http://localhost:8080/swagger)
-- RabbitMQ Management: [http://localhost:15672](http://localhost:15672) (guest/guest)
+- API: http://localhost:8080/swagger
+- RabbitMQ Management: http://localhost:15672 (guest/guest)
 - Healthcheck: `/swagger/v1/swagger.json`
 
 Variáveis usadas no compose:
@@ -129,14 +131,14 @@ Variáveis usadas no compose:
 }
 ```
 
-3. Rode a aplicação:
+4. Rode a aplicação:
 
 ```bash
 dotnet restore
 dotnet run --project StockApi/StockApi.csproj
 ```
 
-Swagger: [http://localhost:5189/swagger](http://localhost:5189/swagger)
+Swagger: http://localhost:5189/swagger
 
 ---
 
@@ -183,7 +185,7 @@ No `/auth/signup`, envie role como string ("Admin" ou "Seller").
 
 1. Rodar API + RabbitMQ via Docker.
 2. Criar pedido (`POST /orders`).
-3. Verificar fila no painel [http://localhost:15672](http://localhost:15672).
+3. Verificar fila no painel http://localhost:15672.
 4. Logs da API exibem consumo:
 
 ```bash
@@ -195,6 +197,35 @@ docker compose logs -f api
 ## Endpoints
 
 (... permanece igual ...)
+
+---
+
+## Testes Automatizados
+
+- Testes de **integração** (xUnit) exercitam endpoints reais com autenticação JWT.
+- Testes **unitários** cobrem regras de domínio e geração de JWT.
+- Mensageria é desabilitada em `Testing` via `RabbitMq__Disabled=true`.
+- Cobertura de código com script auxiliar:
+
+```bash
+cd StockApi.Tests
+./coverage.sh
+```
+
+O relatório HTML é gerado em `StockApi.Tests/TestResults/**/report/index.html`.
+
+---
+
+## Observabilidade / Tracing (OpenTelemetry)
+
+- Exportador console habilitado em `Development`.
+- Traços para requisições HTTP e ASP.NET.
+
+---
+
+## CI (GitHub Actions)
+
+- Workflow `.github/workflows/dotnet.yml` executa build, testes e publica cobertura no Codecov.
 
 ---
 
@@ -210,6 +241,7 @@ docker compose logs -f api
 | RabbitMq\_\_Host              | Host RabbitMQ              | `rabbitmq`                                                         |
 | RabbitMq\_\_User              | Usuário RabbitMQ           | `guest`                                                            |
 | RabbitMq\_\_Pass              | Senha RabbitMQ             | `guest`                                                            |
+| RabbitMq\_\_Disabled          | Desliga mensageria (tests) | `true`                                                             |
 | ASPNETCORE_URLS (opcional)    | URL Kestrel                | `http://+:8080`                                                    |
 
 ---
@@ -219,14 +251,14 @@ docker compose logs -f api
 - Swagger não abre → confira logs do container.
 - 401 → verifique token e permissões.
 - PendingModelChangesWarning → gere nova migração.
-- Mensagens não aparecem → verifique se `RabbitMq__*` estão corretos e consumer está ativo.
+- Mensagens não aparecem → verifique se `RabbitMq__*` estão corretas e se o consumer está ativo.
 
 ---
 
 ## Licença & Versão
 
 - Licença: MIT
-- Versão: v1.2.2
+- Versão: v1.3.0
 
 ---
 
@@ -238,14 +270,24 @@ Desafio baseado em **Arlequim Stack — Desafio Técnico Backend**.
 
 ## Release Notes
 
-### v1.0.0
+### v1.3.0
 
-- Primeira versão com CRUD de produtos, estoque e pedidos.
+- Testes: suíte estabilizada com cenários de _binding_ inválido e rota/body mismatch.
+- Infra de testes: desabilita RabbitMQ via `RabbitMq__Disabled=true`.
+- Correções nos DTOs utilizados nos testes de integração.
+- README reorganizado e ampliado (seções de testes e variáveis).
 
-### v1.1.0
+### v1.2.2
 
-- Inclusão de testes automatizados (xUnit).
-- Cobertura integrada com Codecov.
+- Correções de documentação e versionamento.
+- Ajuste do número da versão no README.
+- Alinhamento das notas de release com as versões publicadas no GitHub.
+
+### v1.2.1
+
+- Correção: uso de `NullMessageBus` nos testes para evitar falhas de conexão com RabbitMQ.
+- Ajustes no `Program.cs` para registrar RabbitMQ apenas fora de `Testing`.
+- Documentação atualizada para refletir `stock.events` + routing key `orders.created`.
 
 ### v1.2.0
 
@@ -254,14 +296,11 @@ Desafio baseado em **Arlequim Stack — Desafio Técnico Backend**.
 - Atualização do `docker-compose.yml` para incluir serviço RabbitMQ.
 - Variáveis de ambiente `RabbitMq__*` documentadas.
 
-### v1.2.1
+### v1.1.0
 
-- Correção: uso de `NullMessageBus` nos testes para evitar falhas de conexão com RabbitMQ.
-- Ajustes no `Program.cs` para registrar RabbitMQ apenas fora de `Testing`.
-- Documentação atualizada para refletir `stock.events` + routing key `orders.created`.
+- Inclusão de testes automatizados (xUnit).
+- Cobertura integrada com Codecov.
 
-### v1.2.2
+### v1.0.0
 
-- Release de correção de documentação e versionamento.
-- Ajuste do número da versão no README.
-- Alinhamento das notas de release com as versões publicadas no GitHub.
+- Primeira versão com CRUD de produtos, estoque e pedidos.

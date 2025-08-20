@@ -1,8 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using StockApi.Data;
 using StockApi.Models;
 
-namespace StockApi.Tests;
+namespace StockApi.Tests.Unit;
 
 public class AuthTests
 {

@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using StockApi.Data;
 using StockApi.Models;
-using Xunit;
+
+namespace StockApi.Tests.Unit;
 
 public class ValidationTests
 {

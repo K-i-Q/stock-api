@@ -1,55 +1,34 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using StockApi.Data;
 using StockApi.Dtos;
 using StockApi.Models;
 using StockApi.Tests.Infra;
 using Xunit;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using StockApi.Data;
-using System.Net.Http.Headers;
+
+namespace StockApi.Tests.Integration;
 
 public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
 {
     private readonly WebApplicationFactory<Program> _factory;
-
     public BranchCoverageTests(CustomWebAppFactory factory) => _factory = factory;
 
     private async Task<string> SignupAndLoginAsync(HttpClient client, string email, string password, UserRole role)
     {
-        var sign = new SignupRequest
-        {
-            Name = "User " + role,
-            Email = email,
-            Password = password,
-            Role = role
-        };
-
+        var sign = new SignupRequest { Name = "User " + role, Email = email, Password = password, Role = role };
         var sres = await client.PostAsJsonAsync("/auth/signup", sign);
+        if (sres.StatusCode != HttpStatusCode.Created && sres.StatusCode != HttpStatusCode.BadRequest) sres.EnsureSuccessStatusCode();
 
-        if (sres.StatusCode != HttpStatusCode.Created && sres.StatusCode != HttpStatusCode.BadRequest)
-            sres.EnsureSuccessStatusCode();
-
-        var lres = await client.PostAsJsonAsync("/auth/login", new LoginRequest
-        {
-            Email = email,
-            Password = password
-        });
-
+        var lres = await client.PostAsJsonAsync("/auth/login", new LoginRequest { Email = email, Password = password });
         Assert.Equal(HttpStatusCode.OK, lres.StatusCode);
         var login = await lres.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.False(string.IsNullOrWhiteSpace(login!.Token));
         return login.Token;
     }
-
-    private static void UseBearer(HttpClient client, string token)
-    {
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-    }
-
 
     [Fact]
     public async Task Products_Get_SemToken_Retorna401()
@@ -66,13 +45,7 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         var token = await TestAuth.SignupAndLoginAsync(client, UserRole.Seller);
         client.UseBearer(token);
 
-        var res = await client.PostAsJsonAsync("/products", new ProductCreateRequest
-        {
-            Name = "X",
-            Price = 10m,
-            Description = "desc"
-        });
-
+        var res = await client.PostAsJsonAsync("/products", new ProductCreateRequest { Name = "X", Price = 10m, Description = "desc" });
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
     }
 
@@ -94,16 +67,10 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         var token = await TestAuth.SignupAndLoginAsync(client, UserRole.Seller);
         client.UseBearer(token);
 
-        var res = await client.PostAsJsonAsync("/orders", new CreateOrderRequest
-        {
-            CustomerDocument = "123",
-            SellerName = "Bob",
-            Items = new()
-        });
-
+        var res = await client.PostAsJsonAsync("/orders", new CreateOrderRequest { CustomerDocument = "123", SellerName = "Bob", Items = new() });
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
-        var body = await res.Content.ReadAsStringAsync();
 
+        var body = await res.Content.ReadAsStringAsync();
         Assert.Contains("\"type\":\"https://tools.ietf.org/html/rfc", body);
         Assert.Contains("Items", body);
     }
@@ -119,10 +86,7 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         {
             CustomerDocument = "123",
             SellerName = "Bob",
-            Items = new()
-            {
-                new CreateOrderItemRequest { ProductId = Guid.NewGuid(), Quantity = 0 }
-            }
+            Items = new() { new CreateOrderItemRequest { ProductId = Guid.NewGuid(), Quantity = 0 } }
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
@@ -141,10 +105,7 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         {
             CustomerDocument = "123",
             SellerName = "Bob",
-            Items = new()
-            {
-                new CreateOrderItemRequest { ProductId = Guid.NewGuid(), Quantity = 1 }
-            }
+            Items = new() { new CreateOrderItemRequest { ProductId = Guid.NewGuid(), Quantity = 1 } }
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
@@ -160,11 +121,7 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         var adminToken = await TestAuth.SignupAndLoginAsync(client, UserRole.Admin);
         client.UseBearer(adminToken);
 
-        var cres = await client.PostAsJsonAsync("/products", new ProductCreateRequest
-        {
-            Name = "Produto Zero",
-            Price = 50m
-        });
+        var cres = await client.PostAsJsonAsync("/products", new ProductCreateRequest { Name = "Produto Zero", Price = 50m });
         Assert.Equal(HttpStatusCode.Created, cres.StatusCode);
         var product = await cres.Content.ReadFromJsonAsync<Product>();
         Assert.NotNull(product);
@@ -192,11 +149,7 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         var adminToken = await TestAuth.SignupAndLoginAsync(client, UserRole.Admin);
         client.UseBearer(adminToken);
 
-        var cres = await client.PostAsJsonAsync("/products", new ProductCreateRequest
-        {
-            Name = "P1",
-            Price = 10m
-        });
+        var cres = await client.PostAsJsonAsync("/products", new ProductCreateRequest { Name = "P1", Price = 10m });
         Assert.Equal(HttpStatusCode.Created, cres.StatusCode);
         var product = await cres.Content.ReadFromJsonAsync<Product>();
         Assert.NotNull(product);
@@ -218,13 +171,8 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
     [Fact]
     public async Task Root_Redirects_To_Swagger()
     {
-        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            AllowAutoRedirect = false
-        });
-
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var res = await client.GetAsync("/");
-
         Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
         Assert.NotNull(res.Headers.Location);
         Assert.EndsWith("/swagger", res.Headers.Location!.ToString(), StringComparison.OrdinalIgnoreCase);
@@ -236,14 +184,13 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         var client = _factory.CreateClient();
 
         var token = await SignupAndLoginAsync(client, "prodlist@local", "abc123", UserRole.Seller);
-        UseBearer(client, token);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var res = await client.GetAsync("/products");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
 
         var list = await res.Content.ReadFromJsonAsync<List<Product>>();
         Assert.NotNull(list);
-
         Assert.True(list!.Count >= 0);
     }
 
@@ -254,14 +201,8 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         var adminToken = await TestAuth.SignupAndLoginAsync(client, UserRole.Admin);
         client.UseBearer(adminToken);
 
-        var req = new ProductUpdateRequest
-        {
-            Name = "Updated",
-            Price = 99
-        };
-
+        var req = new ProductUpdateRequest { Name = "Updated", Price = 99 };
         var res = await client.PutAsJsonAsync($"/products/{Guid.NewGuid()}", req);
-
         Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
     }
 
@@ -273,7 +214,6 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         client.UseBearer(adminToken);
 
         var res = await client.DeleteAsync($"/products/{Guid.NewGuid()}");
-
         Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
     }
 
@@ -282,14 +222,7 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
     {
         var client = _factory.CreateClient();
 
-        var signup = new SignupRequest
-        {
-            Name = "User",
-            Email = "user@x.com",
-            Password = "123456",
-            Role = UserRole.Seller
-        };
-
+        var signup = new SignupRequest { Name = "User", Email = "user@x.com", Password = "123456", Role = UserRole.Seller };
         var res1 = await client.PostAsJsonAsync("/auth/signup", signup);
         Assert.Equal(HttpStatusCode.Created, res1.StatusCode);
 
@@ -306,7 +239,7 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
 
         var bad = await client.PostAsJsonAsync("/auth/login", new LoginRequest
         {
-            Email = ExtractEmailFromTokenForTests(token) ?? "user@local",
+            Email = "user@local",
             Password = "wrongpass"
         });
 
@@ -318,28 +251,17 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
     {
         var client = _factory.CreateClient();
 
-        var lres = await client.PostAsJsonAsync("/auth/login", new LoginRequest
-        {
-            Email = "naoexiste@local",
-            Password = "qualquer"
-        });
-
+        var lres = await client.PostAsJsonAsync("/auth/login", new LoginRequest { Email = "naoexiste@local", Password = "qualquer" });
         Assert.Equal(HttpStatusCode.Unauthorized, lres.StatusCode);
     }
 
     [Fact]
     public async Task Root_Redirects_To_Swagger_SemSeguirRedirect()
     {
-        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            AllowAutoRedirect = false
-        });
-
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var res = await client.GetAsync("/");
         Assert.Equal(HttpStatusCode.Found, res.StatusCode);
-
-        Assert.True(res.Headers.Location?.ToString().Contains("/swagger"),
-            "Location esperado deve conter /swagger");
+        Assert.True(res.Headers.Location?.ToString().Contains("/swagger"));
     }
 
     [Fact]
@@ -352,14 +274,8 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         try
         {
             using var factory = _factory.WithWebHostBuilder(_ => { });
-
-            var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-            {
-                AllowAutoRedirect = false
-            });
-
+            var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
             var res = await client.GetAsync("/");
-
             Assert.True(res.StatusCode == HttpStatusCode.OK || res.StatusCode == HttpStatusCode.Found);
         }
         finally
@@ -397,29 +313,15 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         var client = _factory.CreateClient();
 
         var token = await SignupAndLoginAsync(client, "tq0@local", "123456", UserRole.Admin);
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var create = new ProductCreateRequest
-        {
-            Name = "P-Qty0",
-            Description = "",
-            Price = 10m
-        };
-
-        var rCreate = await client.PostAsJsonAsync("/products", create);
+        var rCreate = await client.PostAsJsonAsync("/products", new ProductCreateRequest { Name = "P-Qty0", Description = "", Price = 10m });
         Assert.Equal(HttpStatusCode.Created, rCreate.StatusCode);
 
-        var produto = await rCreate.Content.ReadFromJsonAsync<ProductDto>();
+        var produto = await rCreate.Content.ReadFromJsonAsync<Product>();
         Assert.NotNull(produto);
 
-        var payload = new StockEntryRequest
-        {
-            ProductId = produto!.Id,
-            Quantity = 0,
-            InvoiceNumber = "NF-001"
-        };
-
+        var payload = new StockEntryRequest { ProductId = produto!.Id, Quantity = 0, InvoiceNumber = "NF-001" };
         var r = await client.PostAsJsonAsync("/stock/entries", payload);
 
         Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
@@ -428,12 +330,10 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         Assert.NotNull(problem);
         Assert.NotNull(problem!.Errors);
 
-        var hasQuantityKey = problem.Errors.Keys.Any(k =>
-            k.Equals("Quantity", StringComparison.OrdinalIgnoreCase));
-        Assert.True(hasQuantityKey, "Deveria haver erro associado a 'Quantity'.");
+        var hasQuantityKey = problem.Errors.Keys.Any(k => k.Equals("Quantity", StringComparison.OrdinalIgnoreCase));
+        Assert.True(hasQuantityKey);
 
-        var msgs = problem.Errors.First(kv =>
-            kv.Key.Equals("Quantity", StringComparison.OrdinalIgnoreCase)).Value;
+        var msgs = problem.Errors.First(kv => kv.Key.Equals("Quantity", StringComparison.OrdinalIgnoreCase)).Value;
         Assert.NotEmpty(msgs);
     }
 
@@ -448,13 +348,7 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         var p = await cres.Content.ReadFromJsonAsync<Product>();
         Assert.NotNull(p);
 
-        var ures = await client.PutAsJsonAsync($"/products/{p!.Id}", new ProductUpdateRequest
-        {
-            Name = "P-Updated",
-            Price = 99m,
-            Description = "desc"
-        });
-
+        var ures = await client.PutAsJsonAsync($"/products/{p!.Id}", new ProductUpdateRequest { Name = "P-Updated", Price = 99m, Description = "desc" });
         Assert.Equal(HttpStatusCode.NoContent, ures.StatusCode);
     }
 
@@ -472,7 +366,7 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         var dres = await client.DeleteAsync($"/products/{p!.Id}");
         Assert.Equal(HttpStatusCode.NoContent, dres.StatusCode);
 
-        var getAfter = await client.GetAsync($"/products/{p.Id}");
+        var getAfter = await client.GetAsync("$=/products/{p.Id}");
         Assert.Equal(HttpStatusCode.NotFound, getAfter.StatusCode);
     }
 
@@ -483,14 +377,9 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         var admin = await TestAuth.SignupAndLoginAsync(client, UserRole.Admin);
         client.UseBearer(admin);
 
-        var res = await client.PostAsJsonAsync("/stock/entries", new StockEntryRequest
-        {
-            ProductId = Guid.NewGuid(),
-            Quantity = 1,
-            InvoiceNumber = "NF-001"
-        });
-
+        var res = await client.PostAsJsonAsync("/stock/entries", new StockEntryRequest { ProductId = Guid.NewGuid(), Quantity = 1, InvoiceNumber = "NF-001" });
         Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+
         var body = await res.Content.ReadAsStringAsync();
         Assert.Contains("Product not found", body);
     }
@@ -499,6 +388,7 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
     public async Task Auth_Signup_SenhaCurta_Deve400()
     {
         var client = _factory.CreateClient();
+
         var res = await client.PostAsJsonAsync("/auth/signup", new SignupRequest
         {
             Name = "X",
@@ -519,14 +409,10 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         client.UseBearer(admin);
 
         var cres = await client.PostAsJsonAsync("/products", new ProductCreateRequest { Name = "P-Order", Price = 25m });
-        var p = await cres.Content.ReadFromJsonAsync<Product>(); Assert.NotNull(p);
+        var p = await cres.Content.ReadFromJsonAsync<Product>();
+        Assert.NotNull(p);
 
-        var sres = await client.PostAsJsonAsync("/stock/entries", new StockEntryRequest
-        {
-            ProductId = p!.Id,
-            Quantity = 3,
-            InvoiceNumber = "NF-OK"
-        });
+        var sres = await client.PostAsJsonAsync("/stock/entries", new StockEntryRequest { ProductId = p!.Id, Quantity = 3, InvoiceNumber = "NF-OK" });
         Assert.Equal(HttpStatusCode.Created, sres.StatusCode);
 
         var seller = await TestAuth.SignupAndLoginAsync(client, UserRole.Seller);
@@ -546,6 +432,4 @@ public class BranchCoverageTests : IClassFixture<CustomWebAppFactory>
         var get = await client.GetAsync($"/orders/{orderId}");
         Assert.Equal(HttpStatusCode.OK, get.StatusCode);
     }
-
-    private static string? ExtractEmailFromTokenForTests(string token) => null;
 }

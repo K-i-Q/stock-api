@@ -1,6 +1,7 @@
+using Xunit;
 using StockApi.Models;
 
-namespace StockApi.Tests;
+namespace StockApi.Tests.Unit;
 
 public class JwtTests
 {

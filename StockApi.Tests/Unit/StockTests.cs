@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using StockApi.Models;
 
-namespace StockApi.Tests;
+namespace StockApi.Tests.Unit;
 
 public class StockTests
 {

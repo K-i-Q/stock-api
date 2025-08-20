@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
 using Xunit;
 using StockApi.Dtos;
@@ -15,7 +14,11 @@ public static class TestAuth
     {
         var email = $"{Guid.NewGuid():N}@test.local";
         const string password = "p4ssw0rd!";
+        return await SignupAndLoginAsync(client, email, password, role);
+    }
 
+    public static async Task<string> SignupAndLoginAsync(HttpClient client, string email, string password, UserRole role)
+    {
         var signup = new SignupRequest
         {
             Name = "Test",
@@ -42,7 +45,6 @@ public static class TestAuth
         var data = await lres.Content.ReadFromJsonAsync<LoginResponse>(JsonOpts);
         Assert.NotNull(data);
         Assert.False(string.IsNullOrWhiteSpace(data!.Token));
-
         return data.Token!;
     }
 

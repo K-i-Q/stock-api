@@ -1,3 +1,5 @@
+namespace StockApi.Tests.Infra;
+
 public static class TestConfig
 {
     public const string JwtKey = "0123456789abcdef0123456789abcdef";

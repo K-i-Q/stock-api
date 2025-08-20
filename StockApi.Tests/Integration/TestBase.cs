@@ -6,9 +6,5 @@ namespace StockApi.Tests.Integration;
 public abstract class TestBase : IClassFixture<CustomWebAppFactory>
 {
     protected readonly CustomWebAppFactory Factory;
-
-    protected TestBase(CustomWebAppFactory factory)
-    {
-        Factory = factory;
-    }
+    protected TestBase(CustomWebAppFactory factory) => Factory = factory;
 }

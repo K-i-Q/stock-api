@@ -1,10 +1,8 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using StockApi.Data;
 using StockApi.Models;
-using Xunit;
+
+namespace StockApi.Tests.Unit;
 
 public class OrderTests
 {
@@ -17,12 +15,6 @@ public class OrderTests
         return new AppDbContext(opts);
     }
 
-    /// <summary>
-    /// Simula a mesma regra do endpoint /orders (Program.cs):
-    /// - valida existência e estoque
-    /// - baixa estoque
-    /// - cria Order/OrderItems
-    /// </summary>
     private static async Task<Order> PlaceOrderAsync(
         AppDbContext db,
         string customerDocument,
@@ -93,8 +85,7 @@ public class OrderTests
         db.Products.Add(prod);
         await db.SaveChangesAsync();
 
-        var order = await PlaceOrderAsync(db, "123.456.789-00", "Carlos",
-            new[] { (prod.Id, 3) });
+        var order = await PlaceOrderAsync(db, "123.456.789-00", "Carlos", new[] { (prod.Id, 3) });
 
         var updated = await db.Products.FindAsync(prod.Id);
         Assert.NotNull(updated);
@@ -123,8 +114,7 @@ public class OrderTests
         await db.SaveChangesAsync();
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            PlaceOrderAsync(db, "999.999.999-99", "Vendedor",
-                new[] { (prod.Id, 5) }));
+            PlaceOrderAsync(db, "999.999.999-99", "Vendedor", new[] { (prod.Id, 5) }));
 
         Assert.Contains("Insufficient stock", ex.Message);
 

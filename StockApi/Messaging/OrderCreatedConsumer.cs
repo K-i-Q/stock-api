@@ -5,9 +5,11 @@ using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using StockApi.Events;
+using System.Diagnostics.CodeAnalysis;
 
 namespace StockApi.Messaging;
 
+[ExcludeFromCodeCoverage]
 public class OrderCreatedConsumer : BackgroundService
 {
     private readonly ILogger<OrderCreatedConsumer> _logger;

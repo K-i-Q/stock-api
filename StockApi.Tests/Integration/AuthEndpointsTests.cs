@@ -5,6 +5,8 @@ using StockApi.Models;
 using StockApi.Tests.Infra;
 using Xunit;
 
+namespace StockApi.Tests.Integration;
+
 public class AuthEndpointsTests : IClassFixture<CustomWebAppFactory>
 {
     private readonly CustomWebAppFactory _factory;

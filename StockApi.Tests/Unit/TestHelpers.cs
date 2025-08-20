@@ -4,7 +4,7 @@ using StockApi.Data;
 using StockApi.Services;
 using System.Text;
 
-namespace StockApi.Tests;
+namespace StockApi.Tests.Unit;
 
 public static class TestHelpers
 {

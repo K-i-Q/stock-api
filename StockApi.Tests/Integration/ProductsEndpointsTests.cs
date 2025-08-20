@@ -7,6 +7,8 @@ using StockApi.Models;
 using StockApi.Tests.Infra;
 using Xunit;
 
+namespace StockApi.Tests.Integration;
+
 public class ProductsEndpointsTests : IClassFixture<CustomWebAppFactory>
 {
     private readonly CustomWebAppFactory _factory;
@@ -22,21 +24,13 @@ public class ProductsEndpointsTests : IClassFixture<CustomWebAppFactory>
             Role = UserRole.Admin
         });
 
-        Assert.True(rSignup.StatusCode is HttpStatusCode.Created or HttpStatusCode.BadRequest,
-            $"Signup falhou: {(int)rSignup.StatusCode} {rSignup.StatusCode}. Body: {await rSignup.Content.ReadAsStringAsync()}");
+        Assert.True(rSignup.StatusCode is HttpStatusCode.Created or HttpStatusCode.BadRequest);
 
-        var r = await client.PostAsJsonAsync("/auth/login", new LoginRequest
-        {
-            Email = "admin1@local",
-            Password = "admin123"
-        });
-
+        var r = await client.PostAsJsonAsync("/auth/login", new LoginRequest { Email = "admin1@local", Password = "admin123" });
         var body = await r.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
 
-        var data = JsonSerializer.Deserialize<LoginResponse>(body,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
+        var data = JsonSerializer.Deserialize<LoginResponse>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         Assert.NotNull(data);
         Assert.False(string.IsNullOrWhiteSpace(data!.Token));
         return data.Token;
@@ -53,7 +47,7 @@ public class ProductsEndpointsTests : IClassFixture<CustomWebAppFactory>
         var rCreate = await client.PostAsJsonAsync("/products", create);
         Assert.Equal(HttpStatusCode.Created, rCreate.StatusCode);
 
-        var created = await rCreate.Content.ReadFromJsonAsync<ProductDto>();
+        var created = await rCreate.Content.ReadFromJsonAsync<Product>();
         Assert.NotNull(created);
         Assert.Equal("Bola", created!.Name);
 

@@ -1,9 +1,11 @@
 using System.Text;
 using System.Text.Json;
 using RabbitMQ.Client;
+using System.Diagnostics.CodeAnalysis;
 
 namespace StockApi.Messaging;
 
+[ExcludeFromCodeCoverage]
 public class RabbitMqMessageBus : IMessageBus, IDisposable
 {
     private readonly IConnection _conn;

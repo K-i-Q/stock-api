@@ -4,7 +4,6 @@ using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using StockApi.Models;
 using StockApi.Services;
-using Xunit;
 
 namespace StockApi.Tests.Unit;
 

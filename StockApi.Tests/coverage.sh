@@ -6,5 +6,5 @@ reportgenerator \
   "-reports:TestResults/**/coverage.cobertura.xml" \
   "-targetdir:coveragereport" \
   "-assemblyfilters:+StockApi" \
-  "-filefilters:-*Migrations/*.cs"
+  "-filefilters:-*Migrations/*.cs;-*Dtos/*.cs"
 open coveragereport/index.html
