@@ -365,7 +365,7 @@ Desafio baseado em **Arlequim Stack — Desafio Técnico Backend**.
 - Melhoria nos testes de integração cobrindo cenários de inconsistência de rota e binding inválido.
 - Atualização do README para refletir novos comportamentos de validação.
 
-### v1.3.1
+### v1.3.3
 
 - Atualização do README para refletir melhorias de documentação.
 - Ajustes de versionamento e alinhamento das seções já implementadas.
